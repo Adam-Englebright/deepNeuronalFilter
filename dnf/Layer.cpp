@@ -1,6 +1,7 @@
 #include "Layer.h"
 #include "Neuron.h"
 
+#include <cstddef>
 #include <stdio.h>
 #include <assert.h>
 #include <iostream>
@@ -95,6 +96,13 @@ void Layer::propInputs(int _index, double _value){
 
 void Layer::calcOutputs(){
 	for (int i=0; i<nNeurons; i++){
+		layerHasReported = neurons[i]->calcOutput(layerHasReported);
+	}
+}
+
+void Layer::calcOutputsMT(const size_t _startIndex, const size_t _endIndex) {
+	//std::cout << "In calcOutputsMT. startIndex = " << _startIndex << ", endIndex = " << _endIndex << std::endl;
+	for (size_t i=_startIndex; i<=_endIndex; i++) {
 		layerHasReported = neurons[i]->calcOutput(layerHasReported);
 	}
 }

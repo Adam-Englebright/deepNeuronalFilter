@@ -2,6 +2,7 @@
 #include "Layer.h"
 #include "Neuron.h"
 
+#include <cstddef>
 #include <stdio.h>
 #include <assert.h>
 #include <iostream>
@@ -16,6 +17,7 @@
 #include <iostream>
 #include <string>
 #include <numeric>
+#include <vector>
 #include <vector>
 
 using namespace std;
@@ -85,6 +87,92 @@ void Net::propInputs(){
 		}
 	}
 	layers[nLayers-1]->calcOutputs();
+	/* this calculates the final outoup of the network,
+	 * i.e. the output of the final layer
+	 * but this is not fed into any further layer*/
+}
+
+void Net::propInputs(const unsigned char _nThreads) {
+	// Propagate though the layers of the network.
+	for (int i=0; i<nLayers-1; i++) {
+		// Calculate values for assigning neuron index ranges to threads.
+		int neuronsPerLayer = layers[i]->getnNeurons();
+		int neuronsPerThread = neuronsPerLayer / _nThreads;
+		int neuronsPerThreadRemainder = neuronsPerLayer % _nThreads;
+
+		// Log if we have less neurons than threads.
+		bool lessNeuronsThanThreads = false;
+		if (neuronsPerThread == 0)
+			lessNeuronsThanThreads = true;
+
+		// Create vector for storing the threads created to calculate neuron outputs.
+		std::vector<std::thread> calculateOutputThreads;
+		calculateOutputThreads.reserve(lessNeuronsThanThreads ? neuronsPerLayer : _nThreads);
+
+		// Calculate approprate neuron index ranges for each thread and send them on their way.
+		// The maths here assumes that there can not be 0 neurons per
+		// i.e. neuronsPerThread == 0 && neuronsPerThreadRemainder == 0 is never true.
+		size_t startIndex = 0;
+		size_t endIndex = neuronsPerThread - 1;
+		bool addedExtraNeuronPrev = false;
+
+		// Add an extra neuron to our first thread if there was a remainder, and track its addition.
+		if (neuronsPerThreadRemainder != 0) {
+			endIndex++;
+			neuronsPerThreadRemainder--;
+			addedExtraNeuronPrev = true;
+		}
+
+		// Send off the first thread.
+		calculateOutputThreads.push_back(std::thread(&Layer::calcOutputsMT, layers[i], startIndex, endIndex));
+
+		// Branch behaviour based on weather we have more threads than neurons or not.
+		if (lessNeuronsThanThreads) {
+			// One thread for each neuron.
+			for (int j=1; j<neuronsPerLayer; j++) {
+				endIndex = ++startIndex;
+				calculateOutputThreads.push_back(std::thread(&Layer::calcOutputsMT, layers[i], startIndex, endIndex));
+			}
+		}
+		else {
+			// Multiple neurons per thread.
+			for (int j=1; j<_nThreads; j++) {
+				// If there are still neurons from the remainder left over, add an extra neuron to the thread.
+				if (neuronsPerThreadRemainder != 0) {
+					// Increment startIndex by neuronsPerThread,
+					// and add an extra 1 if an extra neuron was added to the previous thread.
+					startIndex += neuronsPerThread + (size_t)addedExtraNeuronPrev;
+					endIndex += neuronsPerThread + 1;
+					neuronsPerThreadRemainder--;
+					calculateOutputThreads.push_back(std::thread(&Layer::calcOutputsMT, layers[i], startIndex, endIndex));
+				}
+				else {
+					startIndex += neuronsPerThread + (size_t)addedExtraNeuronPrev;
+					endIndex += neuronsPerThread;
+					addedExtraNeuronPrev = false;
+					calculateOutputThreads.push_back(std::thread(&Layer::calcOutputsMT, layers[i], startIndex, endIndex));
+				}
+			}
+		}
+
+		// Wait for threads to finnish.
+		for (auto &thread : calculateOutputThreads) {
+			thread.join();
+		}
+
+		//std::cout << "Made it past the thread joins for layer " << i << std::endl;
+		// Propagate inputs forward using calculated outputs from current layer.
+		// TODO: Multi-thread this.
+		for (int j=0; j<layers[i]->getnNeurons(); j++){
+			double inputOuput = layers[i]->getOutput(j);
+			layers[i+1]->propInputs(j, inputOuput);
+		}
+
+		//std::cout << "Made it past the input propagation for layer " << i << std::endl;
+	}
+	//std::cout << "Made it out of for loop" << std::endl;
+	layers[nLayers-1]->calcOutputs();
+	//std::cout << "Made it past final calcOutputs()" << std::endl;
 	/* this calculates the final outoup of the network,
 	 * i.e. the output of the final layer
 	 * but this is not fed into any further layer*/

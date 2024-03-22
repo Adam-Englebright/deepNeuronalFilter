@@ -2,6 +2,7 @@
 
 #include <boost/circular_buffer.hpp>
 
+#include <cstddef>
 #include <stdio.h>
 #include <assert.h>
 #include <iostream>
@@ -78,6 +79,13 @@ public:
 	 * Demands that all neurons in this layer calculate their output
 	 */
 	void calcOutputs();
+
+	/**
+	 * Demands that a range of neurons in this layer calculate their output. For multi-threaded use.
+	 * @param _startIndex Index of first neuron to calculate the outputs for.
+	 * @param _endIndex Index of the last neuron to calculate the outputs for.
+	 */
+	void calcOutputsMT(const size_t _startIndex, const size_t _endIndex);
 
 	/**
 	 * Sets the error to be propagated backward at all neurons in the output layer only.

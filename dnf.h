@@ -22,17 +22,24 @@ public:
 	 * \param numTaps Number of taps for the delay line feeding into the 1st layer
 	 * \param fs Sampling rate of the signals used in Hz.
 	 * \param am The activation function for the neurons. Default is tanh.
+	 * \param _nThreads Number of threads for parallel processing. Default is 1 thread for single threaded operation. A value of 0 will be converted to 1.
 	 **/
 	DNF(const int NLAYERS,
 	    const int numTaps,
 	    const double fs,
 	    const Neuron::actMethod am = Neuron::Act_Tanh,
-	    const bool debugOutput = false
+	    const bool debugOutput = false,
+	    const unsigned char _nThreads = 1
 		) : noiseDelayLineLength(numTaps),
 		    signalDelayLineLength(noiseDelayLineLength / 2),
 		    signal_delayLine(signalDelayLineLength, 0),
 		    nNeurons(new int[NLAYERS]),
-		    noise_delayLine(noiseDelayLineLength, 0) {
+		    noise_delayLine(noiseDelayLineLength, 0),
+		    nThreads(_nThreads) {
+		// Check number of threads is >0
+		if (nThreads < 1)
+			nThreads = 1;
+		
 		// calc an exp reduction of the numbers always reaching 1
 		double b = exp(log(noiseDelayLineLength)/(NLAYERS-1));
 		for(int i=0;i<NLAYERS;i++) {
@@ -72,7 +79,10 @@ public:
 
 		// NOISE INPUT TO NETWORK
 		NNO->setInputs(noise_delayLine);
-		NNO->propInputs();
+		if (nThreads == 1)
+			NNO->propInputs();
+		else
+			NNO->propInputs(nThreads);
 		
 		// REMOVER OUTPUT FROM NETWORK
 		remover = NNO->getOutput(0);
@@ -154,6 +164,7 @@ private:
 	double remover = 0;
 	double f_nn = 0;
 	ErrorPropagation errorPropagation = Backprop;
+	unsigned char nThreads;
 };
 
 #endif

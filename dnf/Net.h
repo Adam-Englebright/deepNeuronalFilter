@@ -15,6 +15,7 @@
 #include <string>
 #include <numeric>
 #include <vector>
+#include <thread>
 
 #include "Layer.h"
 
@@ -75,6 +76,12 @@ public:
  * It propagates the inputs forward through the network.
  */
 	void propInputs();
+
+	/**
+	 * Propagates the inputs forward through the network, multi-threaded.
+	 * \param _nThreads Number of threads for processing.
+	 */
+	void propInputs(const unsigned char _nThreads);
 
 	/**
 	 * Propagates the error backward
@@ -227,4 +234,9 @@ private:
 	 * A pointer to the gradient of the error
 	 */
 	double *errorGradient = NULL;
+
+	/**
+	 * A vector of threads for calculating the output of neurons on a layer.
+	 */
+	//std::vector<std::thread> calculateOutputThreads;
 };

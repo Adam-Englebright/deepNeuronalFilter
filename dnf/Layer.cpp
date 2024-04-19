@@ -107,6 +107,12 @@ void Layer::calcOutputsMT(const size_t _startIndex, const size_t _endIndex) {
 	}
 }
 
+void Layer::calcOutputsVec(const std::vector<size_t>& neuronIndexVec) {
+	for (auto index : neuronIndexVec) {
+		layerHasReported = neurons[index]->calcOutput(layerHasReported);
+	}
+}
+
 //*************************************************************************************
 //back propagation of error:
 //*************************************************************************************

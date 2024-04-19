@@ -88,6 +88,12 @@ public:
 	void calcOutputsMT(const size_t _startIndex, const size_t _endIndex);
 
 	/**
+	 * Demands that a vector of neurons have their outputs calculated. For multi-threaded use.
+	 * @param neuronIndexVec Vector of neuron indices to be processed.
+	 */
+	void calcOutputsVec(const std::vector<size_t>& neuronIndexVec);
+
+	/**
 	 * Sets the error to be propagated backward at all neurons in the output layer only.
 	 * @param _leadError the error to be propagated backward
 	 **/

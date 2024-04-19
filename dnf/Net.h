@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <stdio.h>
 #include <assert.h>
 #include <iostream>
@@ -16,6 +17,9 @@
 #include <numeric>
 #include <vector>
 #include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
 
 #include "Layer.h"
 
@@ -30,6 +34,30 @@
  **/
 class Net {
 
+// Need this initial private to declare this struct before it's used
+// in the declaration of propInputsThread.
+private:
+	/**
+	 * Struct containing meta data for each forward propagation worker thread.
+	 */
+	struct ForwardPropThreadMetaData {
+		/**
+		 * Vector of vectors of neuron indices to process for each layer.
+		 */
+		std::vector<std::vector<size_t>> neuronIndexVecVec;
+
+		/**
+		 * Vector containing the number of threads working on each layer.
+		 */
+		std::vector<size_t> numThreadsVec;
+
+		/**
+		 * Number of layers this thread will work on.
+		 * I.e. neuronIndexVecVec.size()
+		 */
+		size_t numLayers = 0;
+	};
+
 public:
 
 /** Constructor: The neural network that performs the learning.
@@ -37,12 +65,14 @@ public:
  * \param _nNeurons A pointer to an int array with number of
  * neurons for all layers need to have the length of _nLayers.
  * \param _nInputs Number of Inputs to the network
+ * \param _nThreads Number of threads for processing forward propagation.
  **/
 	Net(const int _nLayers,
 	    const int * const _nNeurons,
 	    const int _nInputs,
 	    const int _subject,
-	    const string _trial);
+	    const string _trial,
+	    const unsigned char _nThreads = 1);
 
 /**
  * Destructor
@@ -79,9 +109,13 @@ public:
 
 	/**
 	 * Propagates the inputs forward through the network, multi-threaded.
-	 * \param _nThreads Number of threads for processing.
 	 */
-	void propInputs(const unsigned char _nThreads);
+	void propInputsMT();
+
+	/**
+	 * Forward propagation worker thread.
+	 */
+	void propInputsThread(ForwardPropThreadMetaData metaData);
 
 	/**
 	 * Propagates the error backward
@@ -236,7 +270,64 @@ private:
 	double *errorGradient = NULL;
 
 	/**
-	 * A vector of threads for calculating the output of neurons on a layer.
+	 * Mutex for the forwardPropCV condition variable used to control the forward propagation threads.
 	 */
-	//std::vector<std::thread> calculateOutputThreads;
+	std::mutex forwardPropMtx;
+
+	/**
+	 * Condition variable for controlling the execution of the forward propagation threads.
+	 */
+	std::condition_variable forwardPropCV;
+
+	/**
+	 * Flag storing the condition of the forward propagation through the network.
+	 * Set to false by default, when the DNF is idle and no samples have been provided.
+	 * Set to true once a sample is provided and forward propagation through the network
+	 * is desired, using the worker threads for this task.
+	 */
+	bool forwardPropCond = false;
+
+	/**
+	 * Mutex for the forwardPropFinishedCV condition variable used to signal that the forward
+	 * propagation worker threads have finished.
+	 */
+	std::mutex forwardPropFinishedMtx;
+
+	/**
+	 * Condition variable used to signal that the forward propagation worker threads are finished.
+	 */
+	std::condition_variable forwardPropFinishedCV;
+
+	/**
+	 * Flag storing the condition for the progress of the forward propagation worker threads.
+	 * False if the worker threads have not finished, true if they have.
+	 */
+	bool forwardPropFinishedCond = false;
+
+        /**
+	 * Counter to track how many forward propagation worker threads have finished with
+	 * the network layer currently being processed.
+	 */
+	atomic_size_t forwardPropLayerFinishedCount{0};
+
+	/**
+	 * Counter to track how may forward propagation worker threads are ready to start working,
+	 * and are now waiting for the signal to start.
+	 */
+	atomic_size_t forwardPropReadyCount{0};
+
+	/**
+	 * Number of threads actually doing work. Not necessarily the number requested.
+	 */
+	size_t noThreadsWorking;
+
+	/**
+	 * Flag to indicate to the forward propagation threads that they should terminate.
+	 */
+	bool forwardPropThreadsTerm = false;
+
+	/**
+	 * A vector/pool of threads for calculating the forward propagation through the network.
+	 */
+	std::vector<std::thread> forwardPropThreadPool;
 };

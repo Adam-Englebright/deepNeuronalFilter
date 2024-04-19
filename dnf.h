@@ -48,7 +48,7 @@ public:
 		}
 		
 		//create the neural network
-		NNO = new Net(NLAYERS, nNeurons, noiseDelayLineLength, 0, "");
+		NNO = new Net(NLAYERS, nNeurons, noiseDelayLineLength, 0, "", nThreads);
 		
 		//setting up the neural networks
 		for(int i=0;i<NLAYERS;i++) {
@@ -82,7 +82,7 @@ public:
 		if (nThreads == 1)
 			NNO->propInputs();
 		else
-			NNO->propInputs(nThreads);
+			NNO->propInputsMT();
 		
 		// REMOVER OUTPUT FROM NETWORK
 		remover = NNO->getOutput(0);

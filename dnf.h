@@ -79,28 +79,31 @@ public:
 
 		// NOISE INPUT TO NETWORK
 		NNO->setInputs(noise_delayLine);
-		if (nThreads == 1)
+		if (nThreads == 1) {
 			NNO->propInputs();
-		else
-			NNO->propInputsMT();
-		
-		// REMOVER OUTPUT FROM NETWORK
-		remover = NNO->getOutput(0);
-		f_nn = delayed_signal - remover;
-		
-		// FEEDBACK TO THE NETWORK 
-		NNO->setError(f_nn);
-		switch (errorPropagation) {
-		case Backprop:
-		default:
-			NNO->propErrorBackward();
-			break;
-		case ModulatedHebb:
-			NNO->propModulatedHebb(f_nn);
-			break;
+			
+			// REMOVER OUTPUT FROM NETWORK
+			remover = NNO->getOutput(0);
+			f_nn = delayed_signal - remover;
+			
+			// FEEDBACK TO THE NETWORK 
+			NNO->setError(f_nn);
+			switch (errorPropagation) {
+			case Backprop:
+			default:
+				NNO->propErrorBackward();
+				break;
+			case ModulatedHebb:
+				NNO->propModulatedHebb(f_nn);
+				break;
+			}
+			NNO->updateWeights();
+			return f_nn;
+		} else {
+			double tempvar = NNO->propInputsMT(delayed_signal);
+			//NNO->updateWeights();
+			return tempvar;
 		}
-		NNO->updateWeights();
-		return f_nn;
 	}
 
 	/**

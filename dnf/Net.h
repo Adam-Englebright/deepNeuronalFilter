@@ -109,8 +109,10 @@ public:
 
 	/**
 	 * Propagates the inputs forward through the network, multi-threaded.
+	 * @param _delated_signal Delayed input signal.
+	 * @return Result of the filter operation.
 	 */
-	void propInputsMT();
+	double propInputsMT(double _delayed_signal);
 
 	/**
 	 * Forward propagation worker thread.
@@ -319,12 +321,22 @@ private:
 	/**
 	 * Number of threads actually doing work. Not necessarily the number requested.
 	 */
-	size_t noThreadsWorking;
+	size_t noThreadsWorking = 0;
 
 	/**
 	 * Flag to indicate to the forward propagation threads that they should terminate.
 	 */
 	bool forwardPropThreadsTerm = false;
+
+	/**
+	 * Output of the filter.
+	 */
+	double f_nn;
+
+	/**
+	 * Delayed signal value.
+	 */
+	double delayed_signal;
 
 	/**
 	 * A vector/pool of threads for calculating the forward propagation through the network.

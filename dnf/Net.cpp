@@ -79,21 +79,25 @@ Net::Net(const int _nLayers, const int * const _nNeurons, const int _nInputs, co
 			}
 
 			for (size_t j=0; j<_nThreads; ++j) {
+				threadMetaDataVec[j].neuronIndexVecVec.push_back(neuronIndexVecVec[j]);
 				if (neuronIndexVecVec[j].size() > 0) {
-					threadMetaDataVec[j].neuronIndexVecVec.push_back(neuronIndexVecVec[j]);
 					threadMetaDataVec[j].numLayers++;
 					threadsPerLayerCount++;
 				}
 			}
 
 			// Add threads per layer data to thread meta data structs.
-			for (size_t j=0; j<threadsPerLayerCount; ++j) {
+			for (size_t j=0; j<_nThreads; ++j) {
 				threadMetaDataVec[j].numThreadsVec.push_back(threadsPerLayerCount);
 			}
 		}
 
-		// Assign number of threads actually working.
-		noThreadsWorking = threadMetaDataVec[0].numThreadsVec[0];
+		// Get number of threads actually doing anything. Must be done before starting threads.
+		for (auto metaData : threadMetaDataVec) {
+			if (metaData.numLayers > 0) {
+				noThreadsWorking++;
+			}
+		}
 
 		// Spin up the forward propagation worker threads.
 		for (auto metaData : threadMetaDataVec) {
@@ -158,7 +162,9 @@ void Net::propInputs(){
 	 * but this is not fed into any further layer*/
 }
 
-void Net::propInputsMT() {
+double Net::propInputsMT(double _delayed_signal) {
+	delayed_signal = _delayed_signal;
+	
 	// Busy loop until all threads are ready to go.
 	while (forwardPropReadyCount < noThreadsWorking) {}
 
@@ -179,6 +185,8 @@ void Net::propInputsMT() {
 		forwardPropFinishedCV.wait(lk, [this]{ return forwardPropFinishedCond; });
 		forwardPropFinishedCond = false;
 	}
+
+	return f_nn;
 }
 
 void Net::propInputsThread(ForwardPropThreadMetaData metaData) {
@@ -188,6 +196,7 @@ void Net::propInputsThread(ForwardPropThreadMetaData metaData) {
 		// Wait for notification to start from main thread.
 		{
 			std::unique_lock<std::mutex> lk(forwardPropMtx);
+			forwardPropCond = false;
 			forwardPropReadyCount++;
 			forwardPropCV.wait(lk, [this]{ return forwardPropCond; });
 		}
@@ -197,8 +206,8 @@ void Net::propInputsThread(ForwardPropThreadMetaData metaData) {
 			break;
 
 		// Iterate through layers, propagating inputs forward for a range of neurons on each layer.
-		for (size_t i=0; i<metaData.numLayers; ++i) {
-			layerThreadCount += metaData.numThreadsVec[i];
+		for (size_t i=0; i<(size_t)nLayers; ++i) {
+			layerThreadCount += noThreadsWorking;
 		
 			layers[i]->calcOutputsVec(metaData.neuronIndexVecVec[i]);
 			if (i < (size_t)(nLayers-1)) {
@@ -213,16 +222,52 @@ void Net::propInputsThread(ForwardPropThreadMetaData metaData) {
 			forwardPropLayerFinishedCount++;
 			while (forwardPropLayerFinishedCount.load() < layerThreadCount) {};
 		}
+		//std::cout << "Past forward prop\n";
 
-		// Once finished propagating forwards through layers, reset the forwardPropCond
-		// condition to false. Have every thread do this, so that no mater what thread
-		// finishes first, the condition will be set false before looping to the beginning
-		// of this function and waiting again for a notification from the main thread to
-		// begin.
-		{
-			std::lock_guard<std::mutex> lk(forwardPropMtx);
-			forwardPropCond = false;
+		// Have main worker thread calculate filter output and set error.
+		layerThreadCount += noThreadsWorking;
+		if (metaData.numLayers == (size_t)nLayers) {
+			double remover = getOutput(0);
+			f_nn = delayed_signal - remover;
+			setError(f_nn);
 		}
+		forwardPropLayerFinishedCount++;
+		while (forwardPropLayerFinishedCount.load() < layerThreadCount) {};
+
+		//std::cout << "Past output and error setting\n";
+
+		// Propagate error backwards through layers.
+		double tempError = 0;
+		double tempWeight = 0;
+		for (size_t i = (size_t)(nLayers-1); i > 0 ; --i){
+			layerThreadCount += noThreadsWorking;
+			
+			for (auto k : metaData.neuronIndexVecVec[i-1]){
+				double sum = 0.0;
+				for (int j = 0; j < layers[i]->getnNeurons(); j++){
+					tempError = layers[i]->getNeuron(j)->getError();
+					tempWeight = layers[i]->getWeights(j, (int)k);
+					sum += (tempError * tempWeight);
+				}
+				assert(std::isfinite(sum));
+				layers[i-1]->getNeuron((int)k)->setBackpropError(sum);
+			}
+
+			// Increment thread layer finished counter and busy loop until all threads
+			// have finished with current layer.
+			forwardPropLayerFinishedCount++;
+			while (forwardPropLayerFinishedCount.load() < layerThreadCount) {};
+		}
+
+		// Update weights. No need for thread synchronisation here.
+		layerThreadCount += noThreadsWorking;
+		for (int i = nLayers-1; i >= 0; --i) {
+			for (auto j : metaData.neuronIndexVecVec[i]) {
+				layers[i]->getNeuron((int)j)->updateWeights();
+			}
+		}
+		forwardPropLayerFinishedCount++;
+		while (forwardPropLayerFinishedCount.load() < layerThreadCount) {};
 
 		// If this thread is the one which processes the single neuron on the last layer,
 		// finish by notifying the main thread that we are finished propagating forwards.

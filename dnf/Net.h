@@ -40,7 +40,7 @@ private:
 	/**
 	 * Struct containing meta data for each forward propagation worker thread.
 	 */
-	struct ForwardPropThreadMetaData {
+	struct ThreadMetaData {
 		/**
 		 * Vector of vectors of neuron indices to process for each layer.
 		 */
@@ -65,11 +65,13 @@ public:
  * \param _nNeurons A pointer to an int array with number of
  * neurons for all layers need to have the length of _nLayers.
  * \param _nInputs Number of Inputs to the network
+ * \param _inputBuffer Reference to a circular buffer of inputs.
  * \param _nThreads Number of threads for processing forward propagation.
  **/
 	Net(const int _nLayers,
 	    const int * const _nNeurons,
 	    const int _nInputs,
+	    boost::circular_buffer<double>& _inputBuffer,
 	    const int _subject,
 	    const string _trial,
 	    const unsigned char _nThreads = 1);
@@ -108,16 +110,17 @@ public:
 	void propInputs();
 
 	/**
-	 * Propagates the inputs forward through the network, multi-threaded.
+	 * Filters a sample, multi-threaded.
 	 * @param _delated_signal Delayed input signal.
 	 * @return Result of the filter operation.
 	 */
-	double propInputsMT(double _delayed_signal);
+	double filterMT(double _delayed_signal);
 
 	/**
-	 * Forward propagation worker thread.
+	 * Filter worker thread.
+	 * @param mataData Data required by each thread, namely the neurons of each layer that they are to work on.
 	 */
-	void propInputsThread(ForwardPropThreadMetaData metaData);
+	void filterThread(ThreadMetaData metaData);
 
 	/**
 	 * Propagates the error backward
@@ -227,6 +230,11 @@ public:
 private:
 
 	/**
+	 * Reference to the input circular buffer for the network.
+	 */
+	boost::circular_buffer<double>& inputBuffer;
+
+	/**
 	 * Total number of hidden layers
 	 */
 	int nLayers = 0;
@@ -272,51 +280,52 @@ private:
 	double *errorGradient = NULL;
 
 	/**
-	 * Mutex for the forwardPropCV condition variable used to control the forward propagation threads.
+	 * Mutex for the filterStartCV condition variable used to control the filter threads.
 	 */
-	std::mutex forwardPropMtx;
+	std::mutex filterStartMtx;
 
 	/**
-	 * Condition variable for controlling the execution of the forward propagation threads.
+	 * Condition variable for controlling the execution of the filter threads.
 	 */
-	std::condition_variable forwardPropCV;
+	std::condition_variable filterStartCV;
 
 	/**
-	 * Flag storing the condition of the forward propagation through the network.
+	 * Flag storing the condition of the filter start.
 	 * Set to false by default, when the DNF is idle and no samples have been provided.
-	 * Set to true once a sample is provided and forward propagation through the network
+	 * Set to true once a sample is provided and propagation through the network
 	 * is desired, using the worker threads for this task.
 	 */
-	bool forwardPropCond = false;
+	bool filterStartCond = false;
 
 	/**
-	 * Mutex for the forwardPropFinishedCV condition variable used to signal that the forward
-	 * propagation worker threads have finished.
+	 * Mutex for the filterFinishedCV condition variable used to signal that the filter
+	 * worker threads have finished.
 	 */
-	std::mutex forwardPropFinishedMtx;
+	std::mutex filterFinishedMtx;
 
 	/**
-	 * Condition variable used to signal that the forward propagation worker threads are finished.
+	 * Condition variable used to signal that the filter worker threads have finished.
 	 */
-	std::condition_variable forwardPropFinishedCV;
+	std::condition_variable filterFinishedCV;
 
 	/**
-	 * Flag storing the condition for the progress of the forward propagation worker threads.
+	 * Flag storing the condition for the progress of the filter worker threads.
 	 * False if the worker threads have not finished, true if they have.
 	 */
-	bool forwardPropFinishedCond = false;
+	bool filterFinishedCond = false;
 
         /**
-	 * Counter to track how many forward propagation worker threads have finished with
-	 * the network layer currently being processed.
+	 * Counter to track how many filter worker threads have finished with
+	 * the network component currently being processed. Used for synchronisation
+	 * between threads, to ensure some threads don't run ahead of the others.
 	 */
-	atomic_size_t forwardPropLayerFinishedCount{0};
+	atomic_size_t networkComponentFinishedCount{0};
 
 	/**
-	 * Counter to track how may forward propagation worker threads are ready to start working,
+	 * Counter to track how may filter worker threads are ready to start working,
 	 * and are now waiting for the signal to start.
 	 */
-	atomic_size_t forwardPropReadyCount{0};
+	atomic_size_t filterThreadReadyCount{0};
 
 	/**
 	 * Number of threads actually doing work. Not necessarily the number requested.
@@ -324,9 +333,9 @@ private:
 	size_t noThreadsWorking = 0;
 
 	/**
-	 * Flag to indicate to the forward propagation threads that they should terminate.
+	 * Flag to indicate to the filter threads that they should terminate.
 	 */
-	bool forwardPropThreadsTerm = false;
+	bool filterThreadsTerm = false;
 
 	/**
 	 * Output of the filter.
@@ -339,7 +348,7 @@ private:
 	double delayed_signal;
 
 	/**
-	 * A vector/pool of threads for calculating the forward propagation through the network.
+	 * A vector/pool of threads for calculating a filter result by running through the network.
 	 */
-	std::vector<std::thread> forwardPropThreadPool;
+	std::vector<std::thread> filterThreadPool;
 };

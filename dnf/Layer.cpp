@@ -88,6 +88,16 @@ void Layer::setInputs(const boost::circular_buffer<double>& _inputs, const doubl
 	}
 }
 
+void Layer::setInputsVec(const boost::circular_buffer<double>& _inputs, const std::vector<size_t>& _neurons, const double scale, const unsigned int offset, const int n) {
+	/*this is only for the first layer*/
+	for (int j=0; j< (n < 0 ? nInputs:n); j++){
+		const double input = _inputs[j] * scale; //take this input value
+		for (auto i : _neurons){
+			neurons[i]->setInput(j+(int)offset, input); //set this input value for this neuron
+		}
+	}
+}
+
 void Layer::propInputs(int _index, double _value){
 	for (int i=0; i<nNeurons; i++){
 		neurons[i]->propInputs(_index, _value);

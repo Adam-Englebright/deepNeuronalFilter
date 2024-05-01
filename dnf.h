@@ -45,10 +45,11 @@ public:
 		for(int i=0;i<NLAYERS;i++) {
 			nNeurons[i] = ceil(noiseDelayLineLength / pow(b,i));
 			if (i == (NLAYERS-1)) nNeurons[i] = 1;
+			//std::cout << "Neurons on layer " << i << ": " << nNeurons[i] << std::endl;
 		}
 		
 		//create the neural network
-		NNO = new Net(NLAYERS, nNeurons, noiseDelayLineLength, 0, "", nThreads);
+		NNO = new Net(NLAYERS, nNeurons, noiseDelayLineLength, noise_delayLine, 0, "", nThreads);
 		
 		//setting up the neural networks
 		for(int i=0;i<NLAYERS;i++) {
@@ -77,9 +78,12 @@ public:
 		
 		noise_delayLine.push_front(noise / (double)noiseDelayLineLength);
 
-		// NOISE INPUT TO NETWORK
-		NNO->setInputs(noise_delayLine);
 		if (nThreads == 1) {
+			// NOISE INPUT TO NETWORK
+			//std::cout << "Setting inputs\n";
+			NNO->setInputs(noise_delayLine);
+			
+			//std::cout << "Propagating inputs forward\n";
 			NNO->propInputs();
 			
 			// REMOVER OUTPUT FROM NETWORK
@@ -88,6 +92,7 @@ public:
 			
 			// FEEDBACK TO THE NETWORK 
 			NNO->setError(f_nn);
+			//std::cout << "Propagating error backwards\n";
 			switch (errorPropagation) {
 			case Backprop:
 			default:
@@ -97,12 +102,11 @@ public:
 				NNO->propModulatedHebb(f_nn);
 				break;
 			}
+			//std::cout << "Updating weights\n";
 			NNO->updateWeights();
 			return f_nn;
 		} else {
-			double tempvar = NNO->propInputsMT(delayed_signal);
-			//NNO->updateWeights();
-			return tempvar;
+			return NNO->filterMT(delayed_signal);
 		}
 	}
 

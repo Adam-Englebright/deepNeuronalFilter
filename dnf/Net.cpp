@@ -27,7 +27,11 @@ using namespace std;
 //initialisation:
 //*************************************************************************************
 
-Net::Net(const int _nLayers, const int * const _nNeurons, const int _nInputs, const int _subject, const string _trial, const unsigned char _nThreads){
+Net::Net(const int _nLayers, const int *const _nNeurons, const int _nInputs,
+         boost::circular_buffer<double> &_inputBuffer, const int _subject,
+         const string _trial, const unsigned char _nThreads)
+	:
+	inputBuffer(_inputBuffer) {
 	nLayers = _nLayers; //no. of layers including inputs and outputs layers
 	layers= new Layer*[(unsigned)nLayers];
 	const int* nNeuronsp = _nNeurons; //number of neurons in each layer
@@ -54,9 +58,9 @@ Net::Net(const int _nLayers, const int * const _nNeurons, const int _nInputs, co
 	// to work on. Load thread meta data structs with this data and start threads.
 	if (_nThreads > 1) {
 		// Create vector of ForwardPropThreadMetaData structs, one for each thread.
-		std::vector<ForwardPropThreadMetaData> threadMetaDataVec;
+		std::vector<ThreadMetaData> threadMetaDataVec;
 		for (size_t i=0; i<_nThreads; ++i) {
-			ForwardPropThreadMetaData metaData;
+			ThreadMetaData metaData;
 			threadMetaDataVec.push_back(metaData);
 		}
 
@@ -102,7 +106,7 @@ Net::Net(const int _nLayers, const int * const _nNeurons, const int _nInputs, co
 		// Spin up the forward propagation worker threads.
 		for (auto metaData : threadMetaDataVec) {
 			if (metaData.numLayers > 0) {
-				forwardPropThreadPool.push_back(std::thread(&Net::propInputsThread, this, metaData));
+				filterThreadPool.push_back(std::thread(&Net::filterThread, this, metaData));
 			}
 		}
 	}
@@ -110,14 +114,14 @@ Net::Net(const int _nLayers, const int * const _nNeurons, const int _nInputs, co
 
 Net::~Net(){
 	// Have threads terminate.
-	forwardPropThreadsTerm = true;
+	filterThreadsTerm = true;
 	{
-		std::lock_guard<std::mutex> lk(forwardPropMtx);
-		forwardPropCond = true;
+		std::lock_guard<std::mutex> lk(filterStartMtx);
+		filterStartCond = true;
 	}
-	forwardPropCV.notify_all();
+	filterStartCV.notify_all();
 
-	for (auto& thread : forwardPropThreadPool) {
+	for (auto& thread : filterThreadPool) {
 		thread.join();
 	}
 	
@@ -162,52 +166,61 @@ void Net::propInputs(){
 	 * but this is not fed into any further layer*/
 }
 
-double Net::propInputsMT(double _delayed_signal) {
+double Net::filterMT(double _delayed_signal) {
 	delayed_signal = _delayed_signal;
 	
 	// Busy loop until all threads are ready to go.
-	while (forwardPropReadyCount < noThreadsWorking) {}
+	while (filterThreadReadyCount < noThreadsWorking) {}
 
-	// Reset the value of forwardPropLayerFinishedCount and forwardPropReadyCount
-	forwardPropLayerFinishedCount.store(0);
-	forwardPropReadyCount.store(0);
+	// Reset the value of networkComponentFinishedCount and filterThreadReadyCount
+	networkComponentFinishedCount.store(0);
+	filterThreadReadyCount.store(0);
 	
 	// Send notification to forward propagation worker threads to start.
 	{
-		std::lock_guard<std::mutex> lk(forwardPropMtx);
-		forwardPropCond = true;
+		std::lock_guard<std::mutex> lk(filterStartMtx);
+		filterStartCond = true;
 	}
-	forwardPropCV.notify_all();
+	filterStartCV.notify_all();
 
 	// Now wait until forward propagation worker threads have finished.
 	{
-		std::unique_lock<std::mutex> lk(forwardPropFinishedMtx);
-		forwardPropFinishedCV.wait(lk, [this]{ return forwardPropFinishedCond; });
-		forwardPropFinishedCond = false;
+		std::unique_lock<std::mutex> lk(filterFinishedMtx);
+		filterFinishedCV.wait(lk, [this]{ return filterFinishedCond; });
+		filterFinishedCond = false;
 	}
 
+	// Return the filter result
 	return f_nn;
 }
 
-void Net::propInputsThread(ForwardPropThreadMetaData metaData) {
+void Net::filterThread(ThreadMetaData metaData) {
 	while (true) {
-		size_t layerThreadCount = 0;
+		size_t networkComponentCount = 0;
 
 		// Wait for notification to start from main thread.
 		{
-			std::unique_lock<std::mutex> lk(forwardPropMtx);
-			forwardPropCond = false;
-			forwardPropReadyCount++;
-			forwardPropCV.wait(lk, [this]{ return forwardPropCond; });
+			std::unique_lock<std::mutex> lk(filterStartMtx);
+			filterStartCond = false;
+			filterThreadReadyCount++;
+			filterStartCV.wait(lk, [this]{ return filterStartCond; });
 		}
 
 		// Check if the thread is to terminate.
-		if (forwardPropThreadsTerm)
+		if (filterThreadsTerm)
 			break;
+
+		// Set inputs to first layer.
+		networkComponentCount += noThreadsWorking;
+		
+		layers[0]->setInputsVec(inputBuffer, metaData.neuronIndexVecVec[0]);
+		
+		networkComponentFinishedCount++;
+		while (networkComponentFinishedCount.load() < networkComponentCount) {};
 
 		// Iterate through layers, propagating inputs forward for a range of neurons on each layer.
 		for (size_t i=0; i<(size_t)nLayers; ++i) {
-			layerThreadCount += noThreadsWorking;
+			networkComponentCount += noThreadsWorking;
 		
 			layers[i]->calcOutputsVec(metaData.neuronIndexVecVec[i]);
 			if (i < (size_t)(nLayers-1)) {
@@ -217,30 +230,27 @@ void Net::propInputsThread(ForwardPropThreadMetaData metaData) {
 				}
 			}
 
-			// Increment thread layer finished counter and busy loop until all threads
+			// Increment network component finished counter and busy loop until all threads
 			// have finished with current layer.
-			forwardPropLayerFinishedCount++;
-			while (forwardPropLayerFinishedCount.load() < layerThreadCount) {};
+			networkComponentFinishedCount++;
+			while (networkComponentFinishedCount.load() < networkComponentCount) {};
 		}
-		//std::cout << "Past forward prop\n";
 
 		// Have main worker thread calculate filter output and set error.
-		layerThreadCount += noThreadsWorking;
+		networkComponentCount += noThreadsWorking;
 		if (metaData.numLayers == (size_t)nLayers) {
 			double remover = getOutput(0);
 			f_nn = delayed_signal - remover;
 			setError(f_nn);
 		}
-		forwardPropLayerFinishedCount++;
-		while (forwardPropLayerFinishedCount.load() < layerThreadCount) {};
-
-		//std::cout << "Past output and error setting\n";
+		networkComponentFinishedCount++;
+		while (networkComponentFinishedCount.load() < networkComponentCount) {};
 
 		// Propagate error backwards through layers.
 		double tempError = 0;
 		double tempWeight = 0;
 		for (size_t i = (size_t)(nLayers-1); i > 0 ; --i){
-			layerThreadCount += noThreadsWorking;
+			networkComponentCount += noThreadsWorking;
 			
 			for (auto k : metaData.neuronIndexVecVec[i-1]){
 				double sum = 0.0;
@@ -253,30 +263,30 @@ void Net::propInputsThread(ForwardPropThreadMetaData metaData) {
 				layers[i-1]->getNeuron((int)k)->setBackpropError(sum);
 			}
 
-			// Increment thread layer finished counter and busy loop until all threads
+			// Increment network component finished counter and busy loop until all threads
 			// have finished with current layer.
-			forwardPropLayerFinishedCount++;
-			while (forwardPropLayerFinishedCount.load() < layerThreadCount) {};
+			networkComponentFinishedCount++;
+			while (networkComponentFinishedCount.load() < networkComponentCount) {};
 		}
 
-		// Update weights. No need for thread synchronisation here.
-		layerThreadCount += noThreadsWorking;
+		// Update weights. No need for thread synchronisation inside the for loop here.
+		networkComponentCount += noThreadsWorking;
 		for (int i = nLayers-1; i >= 0; --i) {
 			for (auto j : metaData.neuronIndexVecVec[i]) {
 				layers[i]->getNeuron((int)j)->updateWeights();
 			}
 		}
-		forwardPropLayerFinishedCount++;
-		while (forwardPropLayerFinishedCount.load() < layerThreadCount) {};
+		networkComponentFinishedCount++;
+		while (networkComponentFinishedCount.load() < networkComponentCount) {};
 
-		// If this thread is the one which processes the single neuron on the last layer,
-		// finish by notifying the main thread that we are finished propagating forwards.
+		// If this is the main worker thread, which processes the single neuron on the last layer,
+		// finish by notifying the main thread that we are finished filtering.
 		if (metaData.numLayers == (size_t)nLayers) {
 			{
-				std::lock_guard<std::mutex> lk(forwardPropFinishedMtx);
-				forwardPropFinishedCond = true;
+				std::lock_guard<std::mutex> lk(filterFinishedMtx);
+				filterFinishedCond = true;
 			}
-			forwardPropFinishedCV.notify_one();
+			filterFinishedCV.notify_one();
 		}		
 	}
 }

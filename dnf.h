@@ -70,9 +70,10 @@ public:
 	 * Realtime sample by sample filtering operation
 	 * \param signal The signal contaminated with noise. Should be less than one.
 	 * \param noise The reference noise. Should be less than one.
+	 * \param doBackProp Flag to indicate if error backprop and weight updating should be done for this filter operation.
 	 * \returns The filtered signal where the noise has been removed by the DNF.
 	 **/
-	double filter(const double signal, const double noise) {
+	double filter(const double signal, const double noise, const bool doBackProp = true) {
 		signal_delayLine.push_back(signal);
 		const double delayed_signal = signal_delayLine[0];
 		
@@ -89,24 +90,27 @@ public:
 			// REMOVER OUTPUT FROM NETWORK
 			remover = NNO->getOutput(0);
 			f_nn = delayed_signal - remover;
-			
-			// FEEDBACK TO THE NETWORK 
-			NNO->setError(f_nn);
-			//std::cout << "Propagating error backwards\n";
-			switch (errorPropagation) {
-			case Backprop:
-			default:
-				NNO->propErrorBackward();
-				break;
-			case ModulatedHebb:
-				NNO->propModulatedHebb(f_nn);
-				break;
+
+			if (doBackProp) {
+				// FEEDBACK TO THE NETWORK 
+				NNO->setError(f_nn);
+				//std::cout << "Propagating error backwards\n";
+				switch (errorPropagation) {
+				case Backprop:
+				default:
+					NNO->propErrorBackward();
+					break;
+				case ModulatedHebb:
+					NNO->propModulatedHebb(f_nn);
+					break;
+				}
+				//std::cout << "Updating weights\n";
+				NNO->updateWeights();
 			}
-			//std::cout << "Updating weights\n";
-			NNO->updateWeights();
+			
 			return f_nn;
 		} else {
-			return NNO->filterMT(delayed_signal);
+			return NNO->filterMT(delayed_signal, doBackProp);
 		}
 	}
 

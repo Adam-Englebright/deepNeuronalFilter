@@ -167,8 +167,9 @@ void Net::propInputs(){
 	 * but this is not fed into any further layer*/
 }
 
-double Net::filterMT(double _delayed_signal) {
+double Net::filterMT(double _delayed_signal, bool _doBackProp) {
 	delayed_signal = _delayed_signal;
+	doBackProp = _doBackProp;
 	
 	// Busy loop until all threads are ready to go.
 	while (filterThreadReadyCount < noThreadsWorking) {}
@@ -247,38 +248,40 @@ void Net::filterThread(ThreadMetaData metaData) {
 		networkComponentFinishedCount++;
 		while (networkComponentFinishedCount.load() < networkComponentCount) {};
 
-		// Propagate error backwards through layers.
-		double tempError = 0;
-		double tempWeight = 0;
-		for (size_t i = (size_t)(nLayers-1); i > 0 ; --i){
-			networkComponentCount += noThreadsWorking;
-			
-			for (auto k : metaData.neuronIndexVecVec[i-1]){
-				double sum = 0.0;
-				for (int j = 0; j < layers[i]->getnNeurons(); j++){
-					tempError = layers[i]->getNeuron(j)->getError();
-					tempWeight = layers[i]->getWeights(j, (int)k);
-					sum += (tempError * tempWeight);
+		if (doBackProp) {
+			// Propagate error backwards through layers.
+			double tempError = 0;
+			double tempWeight = 0;
+			for (size_t i = (size_t)(nLayers-1); i > 0 ; --i){
+				networkComponentCount += noThreadsWorking;
+				
+				for (auto k : metaData.neuronIndexVecVec[i-1]){
+					double sum = 0.0;
+					for (int j = 0; j < layers[i]->getnNeurons(); j++){
+						tempError = layers[i]->getNeuron(j)->getError();
+						tempWeight = layers[i]->getWeights(j, (int)k);
+						sum += (tempError * tempWeight);
+					}
+					assert(std::isfinite(sum));
+					layers[i-1]->getNeuron((int)k)->setBackpropError(sum);
 				}
-				assert(std::isfinite(sum));
-				layers[i-1]->getNeuron((int)k)->setBackpropError(sum);
+				
+				// Increment network component finished counter and busy loop until all threads
+				// have finished with current layer.
+				networkComponentFinishedCount++;
+				while (networkComponentFinishedCount.load() < networkComponentCount) {};
 			}
-
-			// Increment network component finished counter and busy loop until all threads
-			// have finished with current layer.
+			
+			// Update weights. No need for thread synchronisation inside the for loop here.
+			networkComponentCount += noThreadsWorking;
+			for (int i = nLayers-1; i >= 0; --i) {
+				for (auto j : metaData.neuronIndexVecVec[i]) {
+					layers[i]->getNeuron((int)j)->updateWeights();
+				}
+			}
 			networkComponentFinishedCount++;
 			while (networkComponentFinishedCount.load() < networkComponentCount) {};
 		}
-
-		// Update weights. No need for thread synchronisation inside the for loop here.
-		networkComponentCount += noThreadsWorking;
-		for (int i = nLayers-1; i >= 0; --i) {
-			for (auto j : metaData.neuronIndexVecVec[i]) {
-				layers[i]->getNeuron((int)j)->updateWeights();
-			}
-		}
-		networkComponentFinishedCount++;
-		while (networkComponentFinishedCount.load() < networkComponentCount) {};
 
 		// If this is the main worker thread, which processes the single neuron on the last layer,
 		// finish by notifying the main thread that we are finished filtering.

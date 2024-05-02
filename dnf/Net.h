@@ -117,9 +117,10 @@ public:
 	/**
 	 * Filters a sample, multi-threaded.
 	 * @param _delated_signal Delayed input signal.
+	 * @param _doBackProp Flag to indicate if error backprop and weight updating should be done for this filter operation.
 	 * @return Result of the filter operation.
 	 */
-	double filterMT(double _delayed_signal);
+	double filterMT(double _delayed_signal, bool _doBackProp = true);
 
 	/**
 	 * Filter worker thread.
@@ -351,6 +352,11 @@ private:
 	 * Delayed signal value.
 	 */
 	double delayed_signal;
+
+	/**
+	 * Flag to indicate if error backprop and weight updating should be done for the current filter operation.
+	 */
+	bool doBackProp = true;
 
 	/**
 	 * A vector/pool of threads for calculating a filter result by running through the network.

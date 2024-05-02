@@ -56,6 +56,11 @@ private:
 		 * I.e. neuronIndexVecVec.size()
 		 */
 		size_t numLayers = 0;
+
+		/**
+		 * Thread index.
+		 */
+		size_t threadID = 0;
 	};
 
 public:
@@ -103,7 +108,7 @@ public:
  * of learning, needs to be placed in an infinite loop.
  * @param _inputs A pointer to the array of inputs
  */
-	void setInputs(const boost::circular_buffer<double>& _inputs, const double scale = 1.0, const unsigned int offset = 0, const int n = -1);
+	void setInputs(const boost::circular_buffer<double>& _inputs, const double scale = 1.0, const int n = -1);
 /**
  * It propagates the inputs forward through the network.
  */

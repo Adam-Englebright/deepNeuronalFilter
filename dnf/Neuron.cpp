@@ -24,22 +24,21 @@ Neuron::Neuron(int _nInputs)
 	nInputs=_nInputs;
 	weights = new double[(unsigned)nInputs];
 	initialWeights = new double[(unsigned)nInputs];
-	inputs = new double[(unsigned)nInputs];
 }
 
 Neuron::~Neuron(){
 	delete [] weights;
 	delete [] initialWeights;
-	delete [] inputs;
 }
 
 //*************************************************************************************
 //initialisation:
 //*************************************************************************************
 
-void Neuron::initNeuron(int _neuronIndex, int _layerIndex, weightInitMethod _wim, biasInitMethod _bim, actMethod _am){
+void Neuron::initNeuron(int _neuronIndex, int _layerIndex, double *_inputs, weightInitMethod _wim, biasInitMethod _bim, actMethod _am){
 	myLayerIndex = _layerIndex;
 	myNeuronIndex = _neuronIndex;
+	inputs = _inputs;
 	actMet = _am;
 	for (int i=0; i<nInputs; i++) {
 		switch (_wim) {

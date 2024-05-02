@@ -66,20 +66,19 @@ public:
 	 * Sets the inputs to all neurons in the first hidden layer only
 	 * @param _inputs A reference to a circular buffer of inputs.
 	 * @param scale Scale factor applied to inputs. Default 1.
-	 * @param offset Offset applied to inputs. Default 0.
 	 * @param n Number of inputs set. Default is the number of inputs to the layer.
 	 */
-	void setInputs(const boost::circular_buffer<double>& _inputs, const double scale = 1.0, const unsigned int offset = 0, const int n = -1);
+	void setInputs(const boost::circular_buffer<double>& _inputs, const double scale = 1.0, const int n = -1);
 
 	/**
 	 * Sets the inputs to a vector of neurons in the first hidden layer only. For multi-threaded use.
 	 * @param _inputs A reference to a circular buffer of inputs.
-	 * @param _neurons A reference to a circular buffer of neuron indices.
+	 * @param threadID Thread index starting from 0.
+	 * @param nThreads Number of threads working.
 	 * @param scale Scale factor applied to inputs. Default 1.
-	 * @param offset Offset applied to inputs. Default 0.
 	 * @param n Number of inputs set. Default is the number of inputs to the layer.
 	 */
-	void setInputsVec(const boost::circular_buffer<double>& _inputs, const std::vector<size_t>& _neurons, const double scale = 1.0, const unsigned int offset = 0, const int n = -1);
+	void setInputsMT(const boost::circular_buffer<double>& _inputs, size_t threadID, size_t nThreads, const double scale = 1.0, const int n = -1);
 
 	/**
 	 * Sets the inputs to all neurons in the deeper layers (excluding the first hidden layer)
@@ -211,6 +210,7 @@ private:
 	double learningRate = 0;
 	int myLayerIndex = 0;
 	Neuron **neurons = 0;
+	double *inputs = 0;
     
 	int layerHasReported = 0;
 

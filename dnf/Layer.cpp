@@ -28,6 +28,7 @@ Layer::Layer(int _nNeurons, int _nInputs, int _subject, string _trial){
     trial = _trial;
     nNeurons = _nNeurons; // number of neurons in this layer
     nInputs = _nInputs; // number of inputs to each neuron
+    inputs = new double[(unsigned)nInputs];
     neurons = new Neuron*[(unsigned)nNeurons];
     /* dynamic allocation of memory to n number of
      * neuron-pointers and returning a pointer, "neurons",
@@ -45,7 +46,7 @@ Layer::~Layer(){
         delete neurons[i];
     }
     delete[] neurons;
-    //delete[] inputs;
+    delete[] inputs;
     /* it is important to delete any dynamic
      * memory allocation created by "new" */
 }
@@ -57,7 +58,7 @@ Layer::~Layer(){
 void Layer::initLayer(int _layerIndex, Neuron::weightInitMethod _wim, Neuron::biasInitMethod _bim, Neuron::actMethod _am){
     myLayerIndex = _layerIndex;
     for (int i=0; i<nNeurons; i++){
-        neurons[i]->initNeuron(i, myLayerIndex, _wim, _bim, _am);
+        neurons[i]->initNeuron(i, myLayerIndex, inputs, _wim, _bim, _am);
     }
 }
 
@@ -71,37 +72,23 @@ void Layer::setlearningRate(double _w_learningRate, double _b_learningRate){
 //forward propagation of inputs:
 //*************************************************************************************
 
-void Layer::setInputs(const boost::circular_buffer<double>& _inputs, const double scale, const unsigned int offset, const int n) {
+void Layer::setInputs(const boost::circular_buffer<double>& _inputs, const double scale, const int n) {
 	/*this is only for the first layer*/
 	for (int j=0; j< (n < 0 ? nInputs:n); j++){
-		Neuron** neuronsp = neurons;//point to the 1st neuron
-		/* sets a temporarily pointer to neuron-pointers
-		 * within the scope of this function. this is inside
-		 * the loop, so that it is set to the first neuron
-		 * everytime a new value is distributed to neurons */
-		const double input = _inputs[j] * scale; //take this input value
-		for (int i=0; i<nNeurons; i++){
-		  (*neuronsp)->setInput(j+(int)offset,input);
-			//set this input value for this neuron
-			neuronsp++; //point to the next neuron
-		}
+		inputs[j] = _inputs[j] * scale; //take this input value
 	}
 }
 
-void Layer::setInputsVec(const boost::circular_buffer<double>& _inputs, const std::vector<size_t>& _neurons, const double scale, const unsigned int offset, const int n) {
+void Layer::setInputsMT(const boost::circular_buffer<double>& _inputs, size_t threadID, size_t nThreads, const double scale, const int n) {
 	/*this is only for the first layer*/
-	for (int j=0; j< (n < 0 ? nInputs:n); j++){
-		const double input = _inputs[j] * scale; //take this input value
-		for (auto i : _neurons){
-			neurons[i]->setInput(j+(int)offset, input); //set this input value for this neuron
-		}
+	for (int j=(int)threadID; j< (n < 0 ? nInputs:n); j+=(int)nThreads){
+		inputs[j] = _inputs[j] * scale; //take this input value
 	}
 }
 
 void Layer::propInputs(int _index, double _value){
-	for (int i=0; i<nNeurons; i++){
-		neurons[i]->propInputs(_index, _value);
-	}
+	assert((_index>=0)&&(_index<nInputs));
+	inputs[_index] = _value;
 }
 
 void Layer::calcOutputs(){

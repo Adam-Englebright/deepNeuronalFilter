@@ -61,6 +61,7 @@ Net::Net(const int _nLayers, const int *const _nNeurons, const int _nInputs,
 		std::vector<ThreadMetaData> threadMetaDataVec;
 		for (size_t i=0; i<_nThreads; ++i) {
 			ThreadMetaData metaData;
+			metaData.threadID = i;
 			threadMetaDataVec.push_back(metaData);
 		}
 
@@ -148,8 +149,8 @@ void Net::setLearningRate(double _w_learningRate, double _b_learningRate){
 //forward propagation of inputs:
 //*************************************************************************************
 
-void Net::setInputs(const boost::circular_buffer<double>& _inputs, const double scale, const unsigned int offset, const int n) {
-	layers[0]->setInputs(_inputs, scale, offset, n); //sets the inputs to the first layer only
+void Net::setInputs(const boost::circular_buffer<double>& _inputs, const double scale, const int n) {
+	layers[0]->setInputs(_inputs, scale, n); //sets the inputs to the first layer only
 }
 
 void Net::propInputs(){
@@ -213,7 +214,7 @@ void Net::filterThread(ThreadMetaData metaData) {
 		// Set inputs to first layer.
 		networkComponentCount += noThreadsWorking;
 		
-		layers[0]->setInputsVec(inputBuffer, metaData.neuronIndexVecVec[0]);
+		layers[0]->setInputsMT(inputBuffer, metaData.threadID, noThreadsWorking); 
 		
 		networkComponentFinishedCount++;
 		while (networkComponentFinishedCount.load() < networkComponentCount) {};

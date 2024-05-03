@@ -82,7 +82,7 @@ public:
 		if (nThreads == 1) {
 			// NOISE INPUT TO NETWORK
 			//std::cout << "Setting inputs\n";
-			NNO->setInputs(noise_delayLine);
+			//NNO->setInputs(noise_delayLine);
 			
 			//std::cout << "Propagating inputs forward\n";
 			NNO->propInputs();

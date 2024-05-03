@@ -42,7 +42,7 @@ Net::Net(const int _nLayers, const int *const _nNeurons, const int _nInputs,
 		int numNeurons= *nNeuronsp; //no. neurons in this layer
 		if (i==0){nInput=nInputs;}
 		/* no. inputs to the first layer is equal to no. inputs to the network */
-		layers[i]= new Layer(numNeurons, nInput, _subject, _trial);
+		layers[i]= new Layer(numNeurons, nInput, _subject, _trial, inputBuffer);
 		nNeurons += numNeurons;
 		nWeights += (numNeurons * nInput);
 		nInput=numNeurons;
@@ -215,7 +215,7 @@ void Net::filterThread(ThreadMetaData metaData) {
 		// Set inputs to first layer.
 		networkComponentCount += noThreadsWorking;
 		
-		layers[0]->setInputsMT(inputBuffer, metaData.threadID, noThreadsWorking); 
+		//layers[0]->setInputsMT(inputBuffer, metaData.threadID, noThreadsWorking); 
 		
 		networkComponentFinishedCount++;
 		while (networkComponentFinishedCount.load() < networkComponentCount) {};
@@ -274,10 +274,13 @@ void Net::filterThread(ThreadMetaData metaData) {
 			
 			// Update weights. No need for thread synchronisation inside the for loop here.
 			networkComponentCount += noThreadsWorking;
-			for (int i = nLayers-1; i >= 0; --i) {
+			for (int i = nLayers-1; i > 0; --i) {
 				for (auto j : metaData.neuronIndexVecVec[i]) {
 					layers[i]->getNeuron((int)j)->updateWeights();
 				}
+			}
+			for (auto j : metaData.neuronIndexVecVec[0]) {
+				layers[0]->getNeuron((int)j)->updateWeightsFirstLayer();
 			}
 			networkComponentFinishedCount++;
 			while (networkComponentFinishedCount.load() < networkComponentCount) {};

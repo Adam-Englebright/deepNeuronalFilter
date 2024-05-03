@@ -23,7 +23,10 @@
 // constructor de-constructor
 //*************************************************************************************
 
-Layer::Layer(int _nNeurons, int _nInputs, int _subject, string _trial){
+Layer::Layer(int _nNeurons, int _nInputs, int _subject, string _trial,
+             boost::circular_buffer<double> &_networkInputs)
+  : networkInputs(_networkInputs)
+{
     subject = _subject;
     trial = _trial;
     nNeurons = _nNeurons; // number of neurons in this layer
@@ -34,7 +37,7 @@ Layer::Layer(int _nNeurons, int _nInputs, int _subject, string _trial){
      * neuron-pointers and returning a pointer, "neurons",
      * to the first element */
     for (int i=0;i<nNeurons;i++){
-        neurons[i]=new Neuron(nInputs);
+      neurons[i]=new Neuron(nInputs, networkInputs);
     }
     /* each element of "neurons" pointer is itself a pointer
      * to a neuron object with specific no. of inputs*/
@@ -92,21 +95,38 @@ void Layer::propInputs(int _index, double _value){
 }
 
 void Layer::calcOutputs(){
-	for (int i=0; i<nNeurons; i++){
-		layerHasReported = neurons[i]->calcOutput(layerHasReported);
+	if (myLayerIndex == 0) {
+		for (int i=0; i<nNeurons; i++){
+			layerHasReported = neurons[i]->calcOutputFirstLayer(layerHasReported);
+		}
+	} else {
+		for (int i=0; i<nNeurons; i++){
+			layerHasReported = neurons[i]->calcOutput(layerHasReported);
+		}
 	}
 }
 
 void Layer::calcOutputsMT(const size_t _startIndex, const size_t _endIndex) {
-	//std::cout << "In calcOutputsMT. startIndex = " << _startIndex << ", endIndex = " << _endIndex << std::endl;
-	for (size_t i=_startIndex; i<=_endIndex; i++) {
-		layerHasReported = neurons[i]->calcOutput(layerHasReported);
+	if (myLayerIndex == 0) {
+		for (size_t i=_startIndex; i<=_endIndex; i++) {
+			layerHasReported = neurons[i]->calcOutputFirstLayer(layerHasReported);
+		}
+	} else {
+		for (size_t i=_startIndex; i<=_endIndex; i++) {
+			layerHasReported = neurons[i]->calcOutput(layerHasReported);
+		}
 	}
 }
 
 void Layer::calcOutputsVec(const std::vector<size_t>& neuronIndexVec) {
-	for (auto index : neuronIndexVec) {
-		layerHasReported = neurons[index]->calcOutput(layerHasReported);
+	if (myLayerIndex == 0) {
+		for (auto index : neuronIndexVec) {
+			layerHasReported = neurons[index]->calcOutputFirstLayer(layerHasReported);
+		}
+	} else {
+		for (auto index : neuronIndexVec) {
+			layerHasReported = neurons[index]->calcOutput(layerHasReported);
+		}
 	}
 }
 
@@ -158,9 +178,15 @@ double Layer::getGradient(whichGradient _whichGradient) {
 //*************************************************************************************
 
 void Layer::updateWeights(){
-    for (int i=0; i<nNeurons; i++){
-        neurons[i]->updateWeights();
-    }
+	if (myLayerIndex == 0) {
+		for (int i=0; i<nNeurons; i++){
+			neurons[i]->updateWeightsFirstLayer();
+		}
+	} else {
+		for (int i=0; i<nNeurons; i++){
+			neurons[i]->updateWeights();
+		}
+	}
 }
 
 //*************************************************************************************

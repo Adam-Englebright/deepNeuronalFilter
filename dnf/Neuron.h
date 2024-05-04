@@ -1,6 +1,5 @@
 #pragma once
 
-#include <boost/circular_buffer.hpp>
 
 #include <stdio.h>
 #include <assert.h>
@@ -32,9 +31,8 @@ public:
 	/**
 	 * Constructor for the Neuron class: it initialises a neuron with specific number fo inputs to that neuron
 	 * @param _nInputs
-	 * @param _networkInputs Reference to the input circular buffer for the network.
 	 */
-	Neuron(int _nInputs, boost::circular_buffer<double>& _networkInputs);
+	Neuron(int _nInputs);
 	/**
 	 * Destructor
 	 * De-allocated any memory
@@ -109,14 +107,6 @@ public:
 	int calcOutput(int _layerHasReported);
 
 	/**
-	 * Calculates the output of the neuron by performing a weighed sum of all inputs to this neuron and activating the sum.
-	 * Uses the network input circular buffer for input values, for use on the first network layer.
-	 * @param _layerHasReported boolean variable to indicate whether or not any neuron in this layer has reported exploding output
-	 * @return Returns a boolean to report whether or not this neuron has exploding output
-	 */
-	int calcOutputFirstLayer(int _layerHasReported);
-
-	/**
 	 * Sets the error of the neuron in the first hidden layer that is to be propagated forward
 	 * @param _value value of the error
 	 */
@@ -132,12 +122,6 @@ public:
 	 * Performs one iteration of learning, that is: it updates all the weights assigned to each input to this neuron
 	 */
 	void updateWeights();
-
-	/**
-	 * Performs one iteration of learning, that is: it updates all the weights assigned to each input to this neuron
-	 * Uses the network input circular buffer for input values, for use on the first network layer.
-	 */
-	void updateWeightsFirstLayer();
 	
 	/**
 	 * Performs the activation of the sum output of the neuron
@@ -296,7 +280,6 @@ private:
 	//learning:
 	double *weights = 0;
 	double *inputs = 0;
-	boost::circular_buffer<double>& networkInputs;
 	double weightSum = 0;
 	double maxWeight = 1;
 	double minWeight = 1;

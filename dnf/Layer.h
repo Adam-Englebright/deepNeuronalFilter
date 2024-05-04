@@ -1,6 +1,6 @@
 #pragma once
 
-
+#include <boost/circular_buffer.hpp>
 
 #include <cstddef>
 #include <stdio.h>
@@ -32,9 +32,8 @@ public:
 	 * Constructor for Layer: it initialises the neurons internally.
 	 * @param _nNeurons Total number of neurons in the layer
 	 * @param _nInputs Total number of inputs to that layer
-	 * @param _networkInputs Reference to the input circular buffer for the network.
 	 */
-	Layer(int _nNeurons, int _nInputs, int _subject, string _trial, boost::circular_buffer<double>& _networkInputs);
+	Layer(int _nNeurons, int _nInputs, int _subject, string _trial);
 	/**
 	 * Destructor
 	 * De-allocated any memory
@@ -212,7 +211,6 @@ private:
 	int myLayerIndex = 0;
 	Neuron **neurons = 0;
 	double *inputs = 0;
-	boost::circular_buffer<double>& networkInputs;
     
 	int layerHasReported = 0;
 

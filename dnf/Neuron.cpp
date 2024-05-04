@@ -19,8 +19,7 @@ using namespace std;
 // constructor de-constructor
 //*************************************************************************************
 
-Neuron::Neuron(int _nInputs, boost::circular_buffer<double>& _networkInputs)
-	: networkInputs(_networkInputs)
+Neuron::Neuron(int _nInputs)
 {
 	nInputs=_nInputs;
 	weights = new double[(unsigned)nInputs];
@@ -121,23 +120,6 @@ int Neuron::calcOutput(int _layerHasReported){
 	return iHaveReported;
 }
 
-int Neuron::calcOutputFirstLayer(int _layerHasReported){
-	sum=0;
-	for (int i=0; i<nInputs; i++){
-		sum += networkInputs[i] * weights[i];
-	}
-	sum += bias;
-	assert(std::isfinite(sum));
-	output = doActivation(sum);
-	iHaveReported = _layerHasReported;
-	if (output > 0.49 && iHaveReported == 0){
-		//cout << "I'm saturating, " << output << " layer: " << myLayerIndex << " neuron: " << myNeuronIndex << endl;
-		iHaveReported = 1;
-	}
-	assert(std::isfinite(output));
-	return iHaveReported;
-}
-
 
 //*************************************************************************************
 //back propagation of error
@@ -161,19 +143,6 @@ void Neuron::updateWeights(){
 	minWeight = 0;
 	for (int i=0; i<nInputs; i++){
 		weights[i] += w_learningRate * inputs[i] * error;
-		weightSum += fabs(weights[i]);
-		maxWeight = max (maxWeight,weights[i]);
-		minWeight = min (maxWeight,weights[i]);
-	}
-	bias += b_learningRate * error;
-}
-
-void Neuron::updateWeightsFirstLayer(){
-	weightSum = 0;
-	maxWeight = 0;
-	minWeight = 0;
-	for (int i=0; i<nInputs; i++){
-		weights[i] += w_learningRate * networkInputs[i] * error;
 		weightSum += fabs(weights[i]);
 		maxWeight = max (maxWeight,weights[i]);
 		minWeight = min (maxWeight,weights[i]);

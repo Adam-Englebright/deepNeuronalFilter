@@ -19,6 +19,7 @@ add_subdirectory(eeg_sim)
 add_subdirectory(ecg_filter)
 add_subdirectory(audio_filter)
 add_subdirectory(cvui)
+add_subdirectory(directional_audio)
 
 enable_testing ()
 

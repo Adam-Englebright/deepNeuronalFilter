@@ -22,7 +22,7 @@ Alsa::Alsa(std::string _pdevice, std::string _cdevice, unsigned int _rate,
 {
   int err;
   int dir = 0;
-  constexpr snd_pcm_uframes_t start_threshold = 0x7fffffff;
+  constexpr snd_pcm_uframes_t start_threshold = 1; //0x7fffffff;
   constexpr snd_pcm_format_t format = SND_PCM_FORMAT_S16_LE;
 
   // Setup ALSA standard output
@@ -163,7 +163,9 @@ void Alsa::capturePeriod(void) {
   int err;
   if ((err = snd_pcm_readi(chandle, buffer, period_size_actual)) == -EPIPE) {
     std::cout << "Overrun occurred" << std::endl;
-    snd_pcm_prepare(chandle);
+    if ((err = snd_pcm_recover(chandle, err, 1)) < 0) {
+      std::cout << "Can't recover from overrun, prepare failed: " << snd_strerror(err) << std::endl;
+    }
   } else if (err < 0) {
     std::cout << "Error from readi: " << snd_strerror(err) << std::endl;
   } else if (err != (int)period_size_actual) {
@@ -176,7 +178,9 @@ void Alsa::playbackPeriod(void) {
   int err;
   if ((err = snd_pcm_writei(phandle, buffer, period_size_actual)) == -EPIPE) {
     std::cout << "Underrun occurred" << std::endl;
-    snd_pcm_prepare(phandle);
+    if ((err = snd_pcm_recover(phandle, err, 1)) < 0) {
+      std::cout << "Can't recover from underrrun, prepare failed: " << snd_strerror(err) << std::endl;
+    }
   } else if (err < 0) {
     std::cout << "Error from writei: " << snd_strerror(err) << std::endl;
   } else if (err != (int)period_size_actual) {

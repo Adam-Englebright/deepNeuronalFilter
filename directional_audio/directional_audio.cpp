@@ -17,8 +17,8 @@ int main() {
   std::string capture_device = "hw:2,0";
   std::string playback_device = "hw:2,0";
 
-  int dnf_layers = 1;
-  int dnf_taps = 4;
+  int dnf_layers = 2;
+  int dnf_taps = 300;
   Neuron::actMethod dnf_act_method = Neuron::Act_Tanh;
   bool dnf_debug_output = false;
   unsigned char dnf_threads = 1;
@@ -47,7 +47,7 @@ int main() {
   // Create our DNF with appropriate settings:
   DNF dnf(dnf_layers, dnf_taps, rate_actual, dnf_act_method, dnf_debug_output, dnf_threads);
   
-  audio.start(); // Start the capture and playback devices
+  //audio.start(); // Start the capture and playback devices (now using automatic start as it seems to handle xruns better)
   while (true) {
     audio.capturePeriod(); // Capture a period
 

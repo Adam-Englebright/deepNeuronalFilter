@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <iostream>
 #include "../dnf.h"
+#include "Fir1.h"
 
 int main() {
   // Parameter variables
@@ -17,11 +18,14 @@ int main() {
   std::string capture_device = "hw:2,0";
   std::string playback_device = "hw:2,0";
 
-  int dnf_layers = 2;
-  int dnf_taps = 300;
+  int taps = 160;
+  double learning_rate = 0.05;
+  int dnf_layers = 1;
   Neuron::actMethod dnf_act_method = Neuron::Act_Tanh;
   bool dnf_debug_output = false;
   unsigned char dnf_threads = 1;
+
+  bool filter_with_dnf = true;
   
   /* Create our object, with appropriate ALSA PCM identifiers,
    * sample rate, buffer data organization, and period size in frames.
@@ -45,7 +49,13 @@ int main() {
   std::cout << "Buffer size = " << buffer_size << std::endl;
 
   // Create our DNF with appropriate settings:
-  DNF dnf(dnf_layers, dnf_taps, rate_actual, dnf_act_method, dnf_debug_output, dnf_threads);
+  DNF dnf(dnf_layers, taps, rate_actual, dnf_act_method, dnf_debug_output, dnf_threads);
+  dnf.getNet().setLearningRate(learning_rate, 0);
+
+  // Create LMS filter with corresponding primary signal delay line:
+  Fir1 lms(taps);
+  lms.setLearningRate(learning_rate);
+  boost::circular_buffer<double> primary_delay((taps/2 >= 1 ? taps/2 : 1), 0);
   
   //audio.start(); // Start the capture and playback devices (now using automatic start as it seems to handle xruns better)
   while (true) {
@@ -63,8 +73,19 @@ int main() {
       double primary = (left_sample + right_sample) / 2;
       double reference = (left_sample - right_sample) / 2;
 
-      // Filter
-      double output = dnf.filter(primary, reference);
+      // Filter using DNF or LMS
+      double output;
+      if (filter_with_dnf)
+      {
+	output = dnf.filter(primary, reference);
+      }
+      else
+      {
+	primary_delay.push_back(primary);
+	double delayed_primary = primary_delay[0];
+	output = delayed_primary - lms.filter(reference);
+	lms.lms_update(output);
+      }
 
       // Convert filtered signal back to S16_LE and put back in buffer for playback
       int16_t formatted_output = output * 32768.0;

@@ -25,6 +25,7 @@ int main() {
   bool dnf_debug_output = false;
   unsigned char dnf_threads = 1;
 
+  bool filter = true;
   bool filter_with_dnf = true;
   
   /* Create our object, with appropriate ALSA PCM identifiers,
@@ -61,36 +62,38 @@ int main() {
   while (true) {
     audio.capturePeriod(); // Capture a period
 
-    // Each frame has 2 samples (L+R), each 2 bytes in size (S16_LE).
-    // Therefore, the for loop must increment 4 bytes at a time.
-    // If indexing the buffer, cast to a int16_t*, then this means increments of 2.
-    for (int i = 0; i < buffer_size/2; i += 2) {
-      // Convert samples to doubles
-      double left_sample = (double)( ( (int16_t*)buffer )[i] ) / 32768.0;
-      double right_sample = (double)( ( (int16_t*)buffer )[i+1] ) / 32768.0;
+    if (filter) {
+      // Each frame has 2 samples (L+R), each 2 bytes in size (S16_LE).
+      // Therefore, the for loop must increment 4 bytes at a time.
+      // If indexing the buffer, cast to a int16_t*, then this means increments of 2.
+      for (int i = 0; i < buffer_size/2; i += 2) {
+	// Convert samples to doubles
+	double left_sample = (double)( ( (int16_t*)buffer )[i] ) / 32768.0;
+	double right_sample = (double)( ( (int16_t*)buffer )[i+1] ) / 32768.0;
 
-      // Filter pre-processing
-      double primary = (left_sample + right_sample) / 2;
-      double reference = (left_sample - right_sample) / 2;
+	// Filter pre-processing
+	double primary = (left_sample + right_sample) / 2;
+	double reference = (left_sample - right_sample) / 2;
 
-      // Filter using DNF or LMS
-      double output;
-      if (filter_with_dnf)
-      {
-	output = dnf.filter(primary, reference);
+	// Filter using DNF or LMS
+	double output;
+	if (filter_with_dnf)
+	{
+	  output = dnf.filter(primary, reference);
+	}
+	else
+	{
+	  primary_delay.push_back(primary);
+	  double delayed_primary = primary_delay[0];
+	  output = delayed_primary - lms.filter(reference);
+	  lms.lms_update(output);
+	}
+
+	// Convert filtered signal back to S16_LE and put back in buffer for playback
+	int16_t formatted_output = output * 32768.0;
+	((int16_t*)buffer)[i] = formatted_output;
+	((int16_t*)buffer)[i+1] = formatted_output;
       }
-      else
-      {
-	primary_delay.push_back(primary);
-	double delayed_primary = primary_delay[0];
-	output = delayed_primary - lms.filter(reference);
-	lms.lms_update(output);
-      }
-
-      // Convert filtered signal back to S16_LE and put back in buffer for playback
-      int16_t formatted_output = output * 32768.0;
-      ((int16_t*)buffer)[i] = formatted_output;
-      ((int16_t*)buffer)[i+1] = formatted_output;
     }
     
     audio.playbackPeriod(); // Playback the captured period

@@ -13,10 +13,10 @@
 
 int main() {
   // Parameter variables
-  unsigned int rate_requested = 44100;
-  snd_pcm_uframes_t period_size_requested = 32;
-  std::string capture_device = "hw:2,0";
-  std::string playback_device = "hw:2,0";
+  unsigned int rate_requested = 32000;
+  snd_pcm_uframes_t period_size_requested = 128;
+  std::string capture_device = "hw:0,0";
+  std::string playback_device = "hw:0,0";
 
   int taps = 160;
   double learning_rate = 0.05;

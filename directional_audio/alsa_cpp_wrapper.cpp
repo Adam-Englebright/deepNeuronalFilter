@@ -132,9 +132,11 @@ Alsa::Alsa(std::string _pdevice, std::string _cdevice, unsigned int _rate,
   }
 
   // Link PCM devices
+  /*
   if ((err = snd_pcm_link(chandle, phandle)) < 0) {
     std::cout << "Streams link error: " << snd_strerror(err) << std::endl;
   }
+  */
 
   // Allocate a buffer large enough (in bytes) to hold one period
   // 2 channels * 2 bytes/sample (ASSUMING SND_PCM_FORMAT_S16_LE)
@@ -142,6 +144,7 @@ Alsa::Alsa(std::string _pdevice, std::string _cdevice, unsigned int _rate,
   buffer = (char*) malloc(period_size_actual_bytes);
 
   // Prefill playback buffer to avoid broken pipe when starting
+  /*
   if (snd_pcm_format_set_silence(format, buffer, period_size_actual * 2) < 0) { // 2 channels, hence "* 2"
     std::cout << "Silence error" << std::endl;
   }
@@ -151,6 +154,7 @@ Alsa::Alsa(std::string _pdevice, std::string _cdevice, unsigned int _rate,
   if ((err = snd_pcm_writei(phandle, buffer, period_size_actual)) < 0) {
     std::cout << "Write error 2: " << snd_strerror(err) << std::endl;
   }
+  */
 
   // Dump PCM info
   snd_pcm_dump(chandle, output);

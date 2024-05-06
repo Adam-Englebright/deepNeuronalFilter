@@ -29,19 +29,25 @@ public:
 	    const double fs,
 	    const Neuron::actMethod am = Neuron::Act_Tanh,
 	    const bool debugOutput = false,
-	    const unsigned char _nThreads = 1
+	    const unsigned char _nThreads = 1,
+	    const int _nNeuronsFirstLayer = 0
 		) : noiseDelayLineLength(numTaps),
 		    signalDelayLineLength(noiseDelayLineLength / 2),
 		    signal_delayLine(signalDelayLineLength, 0),
 		    nNeurons(new int[NLAYERS]),
 		    noise_delayLine(noiseDelayLineLength, 0),
-		    nThreads(_nThreads) {
+		    nThreads(_nThreads),
+		    nNeuronsFirstLayer(_nNeuronsFirstLayer) {
 		// Check number of threads is >0
 		if (nThreads < 1)
 			nThreads = 1;
+
+		// Set number of neurons on first layer if default 0 is used
+		if (nNeuronsFirstLayer <= 0)
+			nNeuronsFirstLayer = noiseDelayLineLength;
 		
 		// calc an exp reduction of the numbers always reaching 1
-		double b = exp(log(noiseDelayLineLength)/(NLAYERS-1));
+		double b = exp(log(nNeuronsFirstLayer)/(NLAYERS-1));
 		for(int i=0;i<NLAYERS;i++) {
 			nNeurons[i] = ceil(noiseDelayLineLength / pow(b,i));
 			if (i == (NLAYERS-1)) nNeurons[i] = 1;
@@ -176,6 +182,7 @@ private:
 	double f_nn = 0;
 	ErrorPropagation errorPropagation = Backprop;
 	unsigned char nThreads;
+	int nNeuronsFirstLayer;
 };
 
 #endif

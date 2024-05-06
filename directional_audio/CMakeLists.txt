@@ -10,4 +10,4 @@ add_library(alsa_cpp_wrapper alsa_cpp_wrapper.cpp)
 target_link_libraries(alsa_cpp_wrapper -lasound)
 
 add_executable(directional_audio directional_audio.cpp)
-target_link_libraries(directional_audio alsa_cpp_wrapper dnf)
+target_link_libraries(directional_audio alsa_cpp_wrapper dnf fir)

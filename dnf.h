@@ -49,7 +49,7 @@ public:
 		// calc an exp reduction of the numbers always reaching 1
 		double b = exp(log(nNeuronsFirstLayer)/(NLAYERS-1));
 		for(int i=0;i<NLAYERS;i++) {
-			nNeurons[i] = ceil(noiseDelayLineLength / pow(b,i));
+			nNeurons[i] = ceil(nNeuronsFirstLayer / pow(b,i));
 			if (i == (NLAYERS-1)) nNeurons[i] = 1;
 			//std::cout << "Neurons on layer " << i << ": " << nNeurons[i] << std::endl;
 		}

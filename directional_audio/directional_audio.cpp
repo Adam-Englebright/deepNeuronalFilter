@@ -19,6 +19,7 @@ int main() {
   std::string playback_device = "hw:0,0";
 
   int taps = 160;
+  int dnf_first_layer_neurons = 10;
   double learning_rate = 0.05;
   int dnf_layers = 1;
   Neuron::actMethod dnf_act_method = Neuron::Act_Tanh;
@@ -27,6 +28,7 @@ int main() {
 
   bool filter = true;
   bool filter_with_dnf = true;
+  unsigned int seconds_to_flip_filter = 5;
   
   /* Create our object, with appropriate ALSA PCM identifiers,
    * sample rate, buffer data organization, and period size in frames.
@@ -50,7 +52,7 @@ int main() {
   std::cout << "Buffer size = " << buffer_size << std::endl;
 
   // Create our DNF with appropriate settings:
-  DNF dnf(dnf_layers, taps, rate_actual, dnf_act_method, dnf_debug_output, dnf_threads);
+  DNF dnf(dnf_layers, taps, rate_actual, dnf_act_method, dnf_debug_output, dnf_threads, dnf_first_layer_neurons);
   dnf.getNet().setLearningRate(learning_rate, 0);
 
   // Create LMS filter with corresponding primary signal delay line:
@@ -59,7 +61,13 @@ int main() {
   boost::circular_buffer<double> primary_delay((taps/2 >= 1 ? taps/2 : 1), 0);
   
   //audio.start(); // Start the capture and playback devices (now using automatic start as it seems to handle xruns better)
+  unsigned int counter = 0;
   while (true) {
+    if (counter == seconds_to_flip_filter * rate_actual / period_size_actual) {
+      filter = !filter;
+      counter = 0;
+    }
+    
     audio.capturePeriod(); // Capture a period
 
     if (filter) {
@@ -97,5 +105,7 @@ int main() {
     }
     
     audio.playbackPeriod(); // Playback the captured period
+
+    counter++;
   }
 }

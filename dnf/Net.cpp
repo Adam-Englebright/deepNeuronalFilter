@@ -40,9 +40,12 @@ Net::Net(const int _nLayers, const int *const _nNeurons, const int _nInputs,
 	int nInput = 0; //temporary variable to use within the scope of for loop
 	for (int i=0; i<nLayers; i++){
 		int numNeurons= *nNeuronsp; //no. neurons in this layer
-		if (i==0){nInput=nInputs;}
-		/* no. inputs to the first layer is equal to no. inputs to the network */
-		layers[i]= new Layer(numNeurons, nInput, _subject, _trial);
+		if (i==0) {
+			nInput=nInputs;
+			layers[i]= new Layer(numNeurons, nInput, inputBuffer, _subject, _trial);
+		} else {
+			layers[i]= new Layer(numNeurons, nInput, layers[i-1]->getOutputArray(), _subject, _trial);
+		}
 		nNeurons += numNeurons;
 		nWeights += (numNeurons * nInput);
 		nInput=numNeurons;
@@ -156,10 +159,12 @@ void Net::setInputs(const boost::circular_buffer<double>& _inputs, const double 
 void Net::propInputs(){
 	for (int i=0; i<nLayers-1; i++){
 		layers[i]->calcOutputs();
+		/*
 		for (int j=0; j<layers[i]->getnNeurons(); j++){
 			double inputOuput = layers[i]->getOutput(j);
 			layers[i+1]->propInputs(j, inputOuput);
 		}
+		*/
 	}
 	layers[nLayers-1]->calcOutputs();
 	/* this calculates the final outoup of the network,
@@ -215,7 +220,7 @@ void Net::filterThread(ThreadMetaData metaData) {
 		// Set inputs to first layer.
 		networkComponentCount += noThreadsWorking;
 		
-		layers[0]->setInputsMT(inputBuffer, metaData.threadID, noThreadsWorking); 
+		//layers[0]->setInputsMT(inputBuffer, metaData.threadID, noThreadsWorking); 
 		
 		networkComponentFinishedCount++;
 		while (networkComponentFinishedCount.load() < networkComponentCount) {};
@@ -225,12 +230,14 @@ void Net::filterThread(ThreadMetaData metaData) {
 			networkComponentCount += noThreadsWorking;
 		
 			layers[i]->calcOutputsVec(metaData.neuronIndexVecVec[i]);
+			/*
 			if (i < (size_t)(nLayers-1)) {
 				for (auto j : metaData.neuronIndexVecVec[i]) {
 					double inputOutput = layers[i]->getOutput((int)j);
 					layers[i+1]->propInputs((int)j, inputOutput);
 				}
 			}
+			*/
 
 			// Increment network component finished counter and busy loop until all threads
 			// have finished with current layer.

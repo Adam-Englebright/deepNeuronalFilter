@@ -19,7 +19,9 @@ using namespace std;
 // constructor de-constructor
 //*************************************************************************************
 
-Neuron::Neuron(int _nInputs)
+Neuron::Neuron(int _nInputs, boost::circular_buffer<double>& _layerInputs, boost::circular_buffer<double>& _layerOutputs)
+  : layerInputs(_layerInputs),
+    layerOutputs(_layerOutputs)
 {
 	nInputs=_nInputs;
 	weights = new double[(unsigned)nInputs];
@@ -35,10 +37,9 @@ Neuron::~Neuron(){
 //initialisation:
 //*************************************************************************************
 
-void Neuron::initNeuron(int _neuronIndex, int _layerIndex, double *_inputs, weightInitMethod _wim, biasInitMethod _bim, actMethod _am){
+void Neuron::initNeuron(int _neuronIndex, int _layerIndex, weightInitMethod _wim, biasInitMethod _bim, actMethod _am){
 	myLayerIndex = _layerIndex;
 	myNeuronIndex = _neuronIndex;
-	inputs = _inputs;
 	actMet = _am;
 	for (int i=0; i<nInputs; i++) {
 		switch (_wim) {
@@ -92,7 +93,7 @@ void Neuron::setInput(int _index,  double _value) {
 	 * all the inputs associated with all the neurons in that layer*/
 	assert((_index>=0)&&(_index<nInputs));
 	/*checking _index is a valid int, non-negative and within boundary*/
-	inputs[_index] = _value;
+	layerInputs[_index] = _value;
 }
 
 void Neuron::propInputs(int _index,  double _value){
@@ -100,19 +101,19 @@ void Neuron::propInputs(int _index,  double _value){
 	 * to the neurons in the hidden and output layers
 	 * and not the input layer*/
 	assert((_index>=0)&&(_index<nInputs));
-	inputs[_index] = _value;
+	layerInputs[_index] = _value;
 }
 
 int Neuron::calcOutput(int _layerHasReported){
 	sum=0;
 	for (int i=0; i<nInputs; i++){
-		sum += inputs[i] * weights[i];
+		sum += layerInputs[i] * weights[i];
 	}
 	sum += bias;
 	assert(std::isfinite(sum));
-	output = doActivation(sum);
+	layerOutputs[myNeuronIndex] = doActivation(sum);
 	iHaveReported = _layerHasReported;
-	if (output > 0.49 && iHaveReported == 0){
+	if (layerOutputs[myNeuronIndex] > 0.49 && iHaveReported == 0){
 		//cout << "I'm saturating, " << output << " layer: " << myLayerIndex << " neuron: " << myNeuronIndex << endl;
 		iHaveReported = 1;
 	}
@@ -142,7 +143,7 @@ void Neuron::updateWeights(){
 	maxWeight = 0;
 	minWeight = 0;
 	for (int i=0; i<nInputs; i++){
-		weights[i] += w_learningRate * inputs[i] * error;
+		weights[i] += w_learningRate * layerInputs[i] * error;
 		weightSum += fabs(weights[i]);
 		maxWeight = max (maxWeight,weights[i]);
 		minWeight = min (maxWeight,weights[i]);
@@ -205,7 +206,7 @@ void Neuron::saveWeights(){
 void Neuron::printNeuron(){
 	cout<< "\t \t This neuron has " << nInputs << " inputs:";
 	for (int i=0; i<nInputs; i++){
-		cout<< " " << inputs[i];
+		cout<< " " << layerInputs[i];
 	}
 	cout<<endl;
 	cout<< "\t \t The weights for those inputs are:";

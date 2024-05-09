@@ -55,7 +55,7 @@ public:
 		}
 		
 		//create the neural network
-		NNO = new Net(NLAYERS, nNeurons, noiseDelayLineLength, noise_delayLine, 0, "", nThreads);
+		NNO = new Net(NLAYERS, nNeurons, nNeuronsFirstLayer, noise_delayLine, 0, "", nThreads);
 		
 		//setting up the neural networks
 		for(int i=0;i<NLAYERS;i++) {
@@ -83,12 +83,12 @@ public:
 		signal_delayLine.push_back(signal);
 		const double delayed_signal = signal_delayLine[0];
 		
-		noise_delayLine.push_front(noise); // / (double)noiseDelayLineLength);
+		noise_delayLine.push_front(noise / (double)noiseDelayLineLength);
 
 		if (nThreads == 1) {
 			// NOISE INPUT TO NETWORK
 			//std::cout << "Setting inputs\n";
-			NNO->setInputs(noise_delayLine);
+			//NNO->setInputs(noise_delayLine);
 			
 			//std::cout << "Propagating inputs forward\n";
 			NNO->propInputs();

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <boost/circular_buffer.hpp>
 
 #include <stdio.h>
 #include <assert.h>
@@ -31,8 +32,10 @@ public:
 	/**
 	 * Constructor for the Neuron class: it initialises a neuron with specific number fo inputs to that neuron
 	 * @param _nInputs
+	 * @param _layerInputs Reference to the array of input values for this neuron
+	 * @param _layerOutputs Reference to the array of output values for this neuron's layer
 	 */
-	Neuron(int _nInputs);
+	Neuron(int _nInputs, boost::circular_buffer<double>& _layerInputs, boost::circular_buffer<double>& _layerOutputs);
 	/**
 	 * Destructor
 	 * De-allocated any memory
@@ -73,12 +76,11 @@ public:
 	 * It also specifies the index of the neuron and the index of the layer that contains this neuron.
 	 * @param _neuronIndex The index of this neuron
 	 * @param _layerIndex The index of the layer that contains this neuron
-	 * @param _inputs Pointer to the array of input values for this neuron
 	 * @param _wim The method of initialising the weights, refer to weightInitMethod for more information
 	 * @param _bim The method of initialising the biases, refer to biasInitMethod for more information
 	 * @param _am The function used for activation of neurons, refer to actMethod for more information
 	 */
-	void initNeuron(int _neuronIndex, int _layerIndex, double *_inputs, weightInitMethod _wim, biasInitMethod _bim, actMethod _am);
+	void initNeuron(int _neuronIndex, int _layerIndex, weightInitMethod _wim, biasInitMethod _bim, actMethod _am);
 
 	/** Sets the learning rate.
 	 * @param _learningRate Sets the learning rate for this neuron.
@@ -174,7 +176,7 @@ public:
 	 * @return the output of the neuron after activation
 	 */
 	inline double getOutput() {
-		return output;
+		return layerOutputs[myNeuronIndex];
 	}
 
 	/**
@@ -279,7 +281,8 @@ private:
 
 	//learning:
 	double *weights = 0;
-	double *inputs = 0;
+	boost::circular_buffer<double>& layerInputs;
+	boost::circular_buffer<double>& layerOutputs;
 	double weightSum = 0;
 	double maxWeight = 1;
 	double minWeight = 1;

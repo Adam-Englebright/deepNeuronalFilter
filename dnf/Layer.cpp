@@ -23,18 +23,22 @@
 // constructor de-constructor
 //*************************************************************************************
 
-Layer::Layer(int _nNeurons, int _nInputs, int _subject, string _trial){
+Layer::Layer(int _nNeurons, int _nInputs,
+             boost::circular_buffer<double> &_inputs, int _subject,
+             string _trial)
+  : inputs(_inputs),
+    outputs(_nNeurons, 0)
+{
     subject = _subject;
     trial = _trial;
     nNeurons = _nNeurons; // number of neurons in this layer
     nInputs = _nInputs; // number of inputs to each neuron
-    inputs = new double[(unsigned)nInputs];
     neurons = new Neuron*[(unsigned)nNeurons];
     /* dynamic allocation of memory to n number of
      * neuron-pointers and returning a pointer, "neurons",
      * to the first element */
     for (int i=0;i<nNeurons;i++){
-        neurons[i]=new Neuron(nInputs);
+	    neurons[i]=new Neuron(nInputs, inputs, outputs);
     }
     /* each element of "neurons" pointer is itself a pointer
      * to a neuron object with specific no. of inputs*/
@@ -46,7 +50,6 @@ Layer::~Layer(){
         delete neurons[i];
     }
     delete[] neurons;
-    delete[] inputs;
     /* it is important to delete any dynamic
      * memory allocation created by "new" */
 }
@@ -58,7 +61,7 @@ Layer::~Layer(){
 void Layer::initLayer(int _layerIndex, Neuron::weightInitMethod _wim, Neuron::biasInitMethod _bim, Neuron::actMethod _am){
     myLayerIndex = _layerIndex;
     for (int i=0; i<nNeurons; i++){
-        neurons[i]->initNeuron(i, myLayerIndex, inputs, _wim, _bim, _am);
+        neurons[i]->initNeuron(i, myLayerIndex, _wim, _bim, _am);
     }
 }
 
@@ -198,7 +201,11 @@ double Layer::getWeightDistance(){
 }
 
 double Layer::getOutput(int _neuronIndex){
-    return (neurons[_neuronIndex]->getOutput());
+    return outputs[_neuronIndex];
+}
+
+boost::circular_buffer<double>& Layer::getOutputArray(){
+    return outputs;
 }
 
 int Layer::getnNeurons(){

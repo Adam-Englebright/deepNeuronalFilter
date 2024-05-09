@@ -32,8 +32,10 @@ public:
 	 * Constructor for Layer: it initialises the neurons internally.
 	 * @param _nNeurons Total number of neurons in the layer
 	 * @param _nInputs Total number of inputs to that layer
+	 * @param _inputs Reference to a circular buffer of inputs,
+	 * corresponding to the outputs of the previous layer, or the DNF noise input delay line.
 	 */
-	Layer(int _nNeurons, int _nInputs, int _subject, string _trial);
+	Layer(int _nNeurons, int _nInputs, boost::circular_buffer<double>& _inputs, int _subject, string _trial);
 	/**
 	 * Destructor
 	 * De-allocated any memory
@@ -142,6 +144,12 @@ public:
 	 * @return the activation of that neuron
 	 */
 	double getOutput(int _neuronIndex);
+
+	/**
+	 * Return reference to array of outputs for this layer
+	 * @return Reference to array of outputs
+	 */
+	boost::circular_buffer<double>& getOutputArray();
 	
 	/**
 	 * Allows for accessing the sum output of any specific neuron
@@ -210,7 +218,8 @@ private:
 	double learningRate = 0;
 	int myLayerIndex = 0;
 	Neuron **neurons = 0;
-	double *inputs = 0;
+	boost::circular_buffer<double>& inputs;
+	boost::circular_buffer<double> outputs;
     
 	int layerHasReported = 0;
 

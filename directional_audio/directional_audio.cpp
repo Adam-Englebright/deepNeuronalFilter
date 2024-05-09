@@ -8,8 +8,40 @@
 #include "alsa_cpp_wrapper.hpp"
 #include <cstdint>
 #include <iostream>
+#include <thread>
 #include "../dnf.h"
 #include "Fir1.h"
+
+// Global filter control variables
+bool filter = true;
+bool filter_with_dnf = true;
+
+/**
+ * Function run in a separate thread to take keyboard intput to control
+ * filtering in the main thread.
+ */
+void keyboardControl() {
+  int input;
+  while (true) {
+    std::cin >> input;
+    switch (input) {
+    case 0:
+      filter = false;
+      std::cout << "Case 0\n";
+      break;
+    case 1:
+      filter = true;
+      filter_with_dnf = false;
+      std::cout << "Case 1\n";
+      break;
+    case 2:
+      filter = true;
+      filter_with_dnf = true;
+      std::cout << "Case 2\n";
+      break;
+    }
+  }
+}
 
 int main() {
   // Parameter variables
@@ -26,9 +58,7 @@ int main() {
   bool dnf_debug_output = false;
   unsigned char dnf_threads = 1;
 
-  bool filter = true;
-  bool filter_with_dnf = true;
-  unsigned int seconds_to_flip_filter = 5;
+  //unsigned int seconds_to_flip_filter = 5;
   
   /* Create our object, with appropriate ALSA PCM identifiers,
    * sample rate, buffer data organization, and period size in frames.
@@ -59,15 +89,12 @@ int main() {
   Fir1 lms(taps);
   lms.setLearningRate(learning_rate);
   boost::circular_buffer<double> primary_delay((taps/2 >= 1 ? taps/2 : 1), 0);
+
+  // Start keyboard input thread
+  std::thread keyboard_input_thread(keyboardControl);
   
   //audio.start(); // Start the capture and playback devices (now using automatic start as it seems to handle xruns better)
-  unsigned int counter = 0;
   while (true) {
-    if (counter == seconds_to_flip_filter * rate_actual / period_size_actual) {
-      filter = !filter;
-      counter = 0;
-    }
-    
     audio.capturePeriod(); // Capture a period
 
     if (filter) {
@@ -105,7 +132,5 @@ int main() {
     }
     
     audio.playbackPeriod(); // Playback the captured period
-
-    counter++;
   }
 }

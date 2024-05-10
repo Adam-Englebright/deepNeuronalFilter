@@ -55,7 +55,7 @@ public:
 		}
 		
 		//create the neural network
-		NNO = new Net(NLAYERS, nNeurons, nNeuronsFirstLayer, noise_delayLine, 0, "", nThreads);
+		NNO = new Net(NLAYERS, nNeurons, noiseDelayLineLength, noise_delayLine, 0, "", nThreads);
 		
 		//setting up the neural networks
 		for(int i=0;i<NLAYERS;i++) {

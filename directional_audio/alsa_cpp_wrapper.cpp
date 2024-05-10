@@ -72,7 +72,7 @@ Alsa::Alsa(std::string _pdevice, std::string _cdevice, unsigned int _rate,
   snd_pcm_hw_params_set_period_size_near(phandle, p_params, &period_size_actual, &dir);
 
   // Set buffer size to twice the period size
-  buffer_size = 2 * period_size;
+  buffer_size = 8 * period_size;
   snd_pcm_hw_params_set_buffer_size_near(chandle, c_params, &buffer_size);
   snd_pcm_hw_params_set_buffer_size_near(phandle, p_params, &buffer_size);
 

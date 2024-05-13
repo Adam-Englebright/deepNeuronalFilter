@@ -9,7 +9,10 @@ const float start_time_ignore = 20; // sec
 
 const char* const audioPath = "audio/exp%d/signal_noise.wav";
 
-const Neuron::actMethod ACTIVATION = Neuron::Act_NONE;
+const Neuron::actMethod ACTIVATION = Neuron::Act_Tanh;
+
+// DNF threads
+const unsigned char nThreads = 1;
 
 // number of experiments
 const int nExp = 3; // 2
@@ -24,6 +27,7 @@ const int bufferLength = 1000; // 1000
 
 // Twice the number of taps.
 const int nTapsDNF = 300; //int(fs / noiserefHighpassCutOff) * 3; // 300
+const int nNeuronsFirstLayer = 0; // Default 0 has neurons on first layer = number of taps
 
 // dnf learning rate
 const double dnf_learning_rate = 0.1; // 1

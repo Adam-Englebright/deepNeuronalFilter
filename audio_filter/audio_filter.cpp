@@ -69,7 +69,7 @@ void processOneExperiment(const int expIndex, const bool showPlots = true) {
 	const std::string sd = outpPrefix + expDir + std::to_string(expIndex);
 	std::filesystem::create_directory(sd);
 
-	DNF dnf(NLAYERS,nTapsDNF,fs,ACTIVATION,false,6);
+	DNF dnf(NLAYERS,nTapsDNF,fs,ACTIVATION,false,nThreads,nNeuronsFirstLayer);
 
 	// FILES
 	fstream signalWithNoise_file;
@@ -128,6 +128,7 @@ void processOneExperiment(const int expIndex, const bool showPlots = true) {
 	// main loop processsing sample by sample
 	bool learningRateSet = false;
 	while (wavread.hasSample()) {
+		// Uncomment for benchmarking with 10k tap, 10 layer DNF. Filter only 20 samples.
 		//if (count == 20)
 		//	break;
 		
@@ -145,30 +146,27 @@ void processOneExperiment(const int expIndex, const bool showPlots = true) {
 		const double noiseref_raw = noiseref_gain * noiseref_raw_data;
 		const double noiserefhp = noiseref_filterHP.filter(noiseref_raw);
 
-		//std::cout << "Before filter\n";
+		// Get primary and reference signal
+		//double primary = (signalWithNoise_filtered + noiserefhp) / 2;
+		//double reference = (signalWithNoise_filtered - noiserefhp) / 2;
+
 		double f_nn = dnf.filter(signalWithNoise_filtered,noiserefhp);
 
-		//std::cout << "Filtered\n";
-
-		
 		if (!learningRateSet && count > (samplesNoLearning+nTapsDNF)){
 			dnf.getNet().setLearningRate(dnf_learning_rate, 0);
 			learningRateSet = true;
 		}
 		
 
-		//double t = (double)count / fs;
+		double t = (double)count / fs;
 
-		/*
 		// Write the weight distance to the file
 		wdistance_file << dnf.getNet().getWeightDistance();
 		for(int i=0; i < NLAYERS; i++ ) {
 			wdistance_file << "\t" << dnf.getNet().getLayerWeightDistance(i);
 		}
 		wdistance_file << endl;
-		*/
 
-		/*
 		// Do LMS filter
 		if (count > (samplesNoLearning+nTapsDNF)){
 			lms_filter.setLearningRate(lms_learning_rate);
@@ -178,22 +176,20 @@ void processOneExperiment(const int expIndex, const bool showPlots = true) {
 		double corrLMS = lms_filter.filter(noiserefhp);
 		double lms_output = dnf.getDelayedSignal() - corrLMS;
 		lms_filter.lms_update(lms_output);
-		*/
-
 		
 		// SAVE SIGNALS INTO FILES
 		// undo the gain so that the signal is again in volt
-		//signalWithNoise_file << t << " " << dnf.getDelayedSignal()/signalWithNoise_gain << endl;
-		//noiseref_file << t << " " << noiserefhp/noiseref_gain << " " << endl;
+		signalWithNoise_file << t << " " << dnf.getDelayedSignal()/signalWithNoise_gain << endl;
+                noiseref_file << t << " " << noiserefhp/noiseref_gain << " " << endl;
 
 // ***modified***	dnfOut_file << t << " " << dnf.getOutput()/signalWithNoise_gain << endl;
-		//dnfOut_file << t << " " << f_nn/signalWithNoise_gain << endl;
-		
-		//lmsOut_file << t << " " << lms_output/signalWithNoise_gain << endl;
+		dnfOut_file << t << " " << f_nn/signalWithNoise_gain << endl;
+				
+		lmsOut_file << t << " " << lms_output/signalWithNoise_gain << endl;
 // ***modified***	dnfRemover_file << dnf.getRemover()/signalWithNoise_gain << endl;
-		//dnfRemover_file << t << " " << dnf.getRemover()/signalWithNoise_gain << endl;
+		dnfRemover_file << t << " " << dnf.getRemover()/signalWithNoise_gain << endl;
 // ***modified***	lmsRemover_file << corrLMS/signalWithNoise_gain << endl;
-		//lmsRemover_file << t << " " << corrLMS/signalWithNoise_gain << endl;
+		lmsRemover_file << t << " " << corrLMS/signalWithNoise_gain << endl;
 		
 
 		if (plots) {
@@ -204,8 +200,8 @@ void processOneExperiment(const int expIndex, const bool showPlots = true) {
 		ro_buf.push_back(dnf.getRemover());
 		f_nno_buf.push_back(f_nn);
 		// 2) LMS outputs
-		//lms_o_buf.push_back(lms_output);
-		//lms_r_buf.push_back(corrLMS);
+		lms_o_buf.push_back(lms_output);
+		lms_r_buf.push_back(corrLMS);
 		
 
 		// PUTTING BUFFERS IN VECTORS FOR PLOTS
